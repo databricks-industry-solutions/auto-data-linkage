@@ -1,9 +1,14 @@
 # Databricks notebook source
-# MAGIC %pip install delta-sharing
+# MAGIC %pip install delta-sharing --quiet
 
 # COMMAND ----------
 
-configpath = "/Workspace/Repos/ref/splink-public-sector-hackathon/setup/config.share"
+username = spark.sql('select current_user() as user').collect()[0]['user']
+username
+
+# COMMAND ----------
+
+configpath = f"/Workspace/Repos/{username}/splink-public-sector-hackathon/setup/config.share"
 
 # COMMAND ----------
 
@@ -17,28 +22,29 @@ client.list_all_tables()
 
 # COMMAND ----------
 
-share_name = 'splink-share'
-schema_name= 'splink'
-table_name = 'companies_with_officers'
+def fetch_table(table_name):
+    share_name = 'splink-share'
+    schema_name= 'splink'
 
-
-#df = spark.read.format("deltaSharing").load(f"{profile_path}#{share_name}.{schema_name}.{table_name}")
-df = spark.read.format("deltaSharing").load(f"file:{configpath}#{share_name}.{schema_name}.{table_name}")
-
-#.limit(10)
-
-# COMMAND ----------
-
-df2 = spark.read.format("deltaSharing").load(f"{profile_path}#{share_name}.{schema_name}.company_officers")
-#.limit(10)
+    df = spark.read.format("deltaSharing").load(f"file:{configpath}#{share_name}.{schema_name}.{table_name}")
+    df.write.format("delta").save(f"dbfs:/Filestore/Users/{username}/{table_name}")
+    df = spark.read.format("delta").load(f"dbfs:/Filestore/Users/{username}/{table_name}")
+    return df
 
 # COMMAND ----------
 
-display(df)
+df_companies_with_officers = fetch_table("companies_with_officers")
+df_companies_with_officers.display()
 
 # COMMAND ----------
 
-dbutils.fs.mounts()
+df_payment_practices_of_uk_buyers = fetch_table("payment_practices_of_uk_buyers")
+df_payment_practices_of_uk_buyers.display()
+
+# COMMAND ----------
+
+df_company_officers = fetch_table("company_officers")
+df_company_officers.display()
 
 # COMMAND ----------
 
