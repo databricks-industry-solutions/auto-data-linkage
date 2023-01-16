@@ -10,6 +10,8 @@ from pyspark.sql import SparkSession
 from sklearn.metrics import roc_auc_score, f1_score
 from splink.spark.spark_linker import SparkLinker
 
+from utils.mlflow_utils import *
+
 
 class SplinkLinkerModel(mlflow.pyfunc.PythonModel):
     """
