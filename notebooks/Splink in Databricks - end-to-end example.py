@@ -36,7 +36,19 @@
 
 # COMMAND ----------
 
-pip install git+https://github.com/robertwhiffin/splink.git@mllfow-integration
+# MAGIC %md
+# MAGIC To decouple from Rob's fork. 
+
+# COMMAND ----------
+
+# MAGIC %pip install splink --quiet
+
+# COMMAND ----------
+
+# DBTITLE 1,Get current username
+username = spark.sql('select current_user() as user').collect()[0]['user']
+db_name = username.replace(".", "_").replace("@", "_")
+db_name
 
 # COMMAND ----------
 
@@ -54,7 +66,9 @@ pip install git+https://github.com/robertwhiffin/splink.git@mllfow-integration
 from splink.spark.spark_linker import SparkLinker
 from splink.databricks.enable_splink import enable_splink
 import splink.spark.spark_comparison_library as cl
-from splink.mlflow import splink_mlflow
+
+from utils.splink_linker_model import SplinkLinkerModel
+from utils.mlflow_utils import *
 
 import mlflow
 
@@ -75,17 +89,6 @@ enable_splink(spark)
 # MAGIC ### Setting up a working catalog and database
 # MAGIC 
 # MAGIC We'll create a catalog and a schema for our working tables and results and to make use of Databricks' [Unity Catalog](https://www.databricks.com/product/unity-catalog) unified data governance tool. We'll be writing SQL for this; note the magic command at the top of the cell. We print out the tables in the schema to check that it's empty.
-
-# COMMAND ----------
-
-# MAGIC %sql
-# MAGIC 
-# MAGIC create catalog marcell_ferencz;
-# MAGIC use catalog marcell_ferencz;
-# MAGIC create database splink;
-# MAGIC use database splink;
-# MAGIC 
-# MAGIC show tables
 
 # COMMAND ----------
 
@@ -123,7 +126,10 @@ enable_splink(spark)
 
 # COMMAND ----------
 
-data = spark.read.table("robert_whiffin.splink.companies_with_officers")
+# data = spark.read.table(f"splink_{db_name}.companies_with_officers")
+table_name = "companies_with_officers"
+table_path = f"dbfs:/Filestore/Users/{username}/{table_name}"
+data = spark.read.load(table_path)
 
 # COMMAND ----------
 
@@ -166,7 +172,8 @@ data.filter("uid = 23636 OR uid = 122382").display()
 
 # COMMAND ----------
 
-linker = SparkLinker(data, spark=spark)
+linker_model = SplinkLinkerModel()
+linker_model.spark_linker(data)
 
 # COMMAND ----------
 
@@ -175,7 +182,7 @@ linker = SparkLinker(data, spark=spark)
 
 # COMMAND ----------
 
-linker.missingness_chart()
+linker_model.get_linker().missingness_chart()
 
 # COMMAND ----------
 
@@ -184,11 +191,15 @@ linker.missingness_chart()
 
 # COMMAND ----------
 
-linker.profile_columns("nationality")
+data.columns
 
 # COMMAND ----------
 
-linker.profile_columns("postal_code")
+linker_model.get_linker().profile_columns("nationality")
+
+# COMMAND ----------
+
+linker_model.get_linker().profile_columns("postal_code")
 
 # COMMAND ----------
 
@@ -259,17 +270,6 @@ blocking_rules_to_generate_predictions = [
   "l.address_line_1 = r.address_line_1 and l.postal_code = r.postal_code and l.surname = r.surname",
 ]
 
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC We can visualise these blocking rules using a built-in method within Splink by adding the rules as a setting to our `linker` object. Additionally, we'll define a few more settings that will help us later:
-# MAGIC * `retain_intermediate_calculation_columns` and `retain_matching_columns` are to allow us to visualise the predictions at the end
-# MAGIC * `link_type` is set to only deduplicate (as opposed to link multiple datasets) as we only have one dataset we're trying to deduplicate
-# MAGIC * `unique_id_column_name` tells Splink the unique identifier column of our dataset
-# MAGIC * `em_convergence` is setting a convergence threshold expectation-maximalisation algorithm
-
-# COMMAND ----------
-
 settings = {
   "retain_intermediate_calculation_columns": True,
   "retain_matching_columns": True,
@@ -278,17 +278,27 @@ settings = {
   "em_convergence": 0.01,
   "blocking_rules_to_generate_predictions": blocking_rules_to_generate_predictions
 }
-linker.initialise_settings(settings)
+
+linker_model.set_settings(settings)
 
 # COMMAND ----------
 
-linker.cumulative_num_comparisons_from_blocking_rules_chart(blocking_rules_to_generate_predictions)
+linker_model.get_linker().cumulative_num_comparisons_from_blocking_rules_chart(blocking_rules_to_generate_predictions)
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC 
 # MAGIC Here we confirm the 140,000 number I quoted above, with our second rule contributing the most to the total number of comparisons.
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC We can visualise these blocking rules using a built-in method within Splink by adding the rules as a setting to our `linker` object. Additionally, we'll define a few more settings that will help us later:
+# MAGIC * `retain_intermediate_calculation_columns` and `retain_matching_columns` are to allow us to visualise the predictions at the end
+# MAGIC * `link_type` is set to only deduplicate (as opposed to link multiple datasets) as we only have one dataset we're trying to deduplicate
+# MAGIC * `unique_id_column_name` tells Splink the unique identifier column of our dataset
+# MAGIC * `em_convergence` is setting a convergence threshold expectation-maximalisation algorithm
 
 # COMMAND ----------
 
@@ -331,7 +341,6 @@ linker.cumulative_num_comparisons_from_blocking_rules_chart(blocking_rules_to_ge
 # COMMAND ----------
 
 comparisons = [
-  cl.levenshtein_at_thresholds("name", 3),
   cl.levenshtein_at_thresholds("surname", 10),
   cl.levenshtein_at_thresholds("forenames", 10),
   cl.levenshtein_at_thresholds("address_line_1", 5),
@@ -346,9 +355,7 @@ comparisons = [
 
 # COMMAND ----------
 
-settings.update({"comparisons": comparisons})
-
-linker.initialise_settings(settings)
+linker_model.set_comparisons(comparisons)
 
 # COMMAND ----------
 
@@ -377,7 +384,7 @@ deterministic_rules = [
 
 # COMMAND ----------
 
-linker.estimate_probability_two_random_records_match(deterministic_rules, recall=0.8)
+linker_model.estimate_random_match_probability(deterministic_rules, recall=0.8)
 
 # COMMAND ----------
 
@@ -395,7 +402,7 @@ linker.estimate_probability_two_random_records_match(deterministic_rules, recall
 
 # COMMAND ----------
 
-linker.estimate_u_using_random_sampling(target_rows=1e7)
+linker_model.estimate_u(target_rows=1e7)
 
 # COMMAND ----------
 
@@ -411,11 +418,13 @@ linker.estimate_u_using_random_sampling(target_rows=1e7)
 
 # COMMAND ----------
 
+# change the surname and forname so that distace dont complain
+#remove name from here
 training_rule = "l.name = r.name and l.date_of_birth = r.date_of_birth"
 
 # COMMAND ----------
 
-linker.estimate_parameters_using_expectation_maximisation(training_rule)
+linker_model.get_linker().estimate_parameters_using_expectation_maximisation(training_rule)
 
 # COMMAND ----------
 
@@ -428,7 +437,16 @@ training_rule = "l.surname = r.surname and l.forenames = r.forenames"
 
 # COMMAND ----------
 
-linker.estimate_parameters_using_expectation_maximisation(training_rule)
+linker_model.get_linker().estimate_parameters_using_expectation_maximisation(training_rule)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC SplinkLinkerModel also provides randomised 2 stage m estimation.
+
+# COMMAND ----------
+
+linker_model.estimate_m(data, ["name", "date_of_birth"], ["surname", "forenames"])
 
 # COMMAND ----------
 
@@ -439,7 +457,7 @@ linker.estimate_parameters_using_expectation_maximisation(training_rule)
 
 # COMMAND ----------
 
-linker.m_u_parameters_chart()
+linker_model.get_linker().m_u_parameters_chart()
 
 # COMMAND ----------
 
@@ -452,7 +470,7 @@ linker.m_u_parameters_chart()
 
 # COMMAND ----------
 
-predictions = linker.predict(threshold_match_probability=0.9)
+predictions = linker_model.predict(None, data)
 pdf_predictions = predictions.as_pandas_dataframe()
 spark.createDataFrame(pdf_predictions).display()
 
@@ -466,7 +484,7 @@ spark.createDataFrame(pdf_predictions).display()
 # COMMAND ----------
 
 dict_predictions = predictions.as_record_dict(limit=20)
-linker.waterfall_chart(dict_predictions)
+linker_model.get_linker().waterfall_chart(dict_predictions)
 
 
 # COMMAND ----------
@@ -478,8 +496,50 @@ linker.waterfall_chart(dict_predictions)
 
 # COMMAND ----------
 
-splink_mlflow.log_splink_model_to_mlflow(
-  linker=linker,
-  model_name="my_first_splink_model",
-  log_charts=True
-)
+with mlflow.start_run() as run:
+    model = SplinkLinkerModel()
+    model.spark_linker(data.limit(100))
+    model.set_settings(settings)
+    model.set_blocking_rules(blocking_rules_to_generate_predictions)
+    model.set_comparisons(comparisons)
+    model.set_target_rows(1e7)
+    model.set_stage1_columns(["name", "date_of_birth"])
+    model.set_stage2_columns(["surname", "forenames"])
+    
+    model.fit(data)
+    model.log_settings_as_json("linker_settings.json")
+    
+    params = get_hyperparameters(model.get_settings_object())
+    all_comparisons = get_all_comparisons(model.get_settings_object())
+    charts = get_linker_charts(model.get_linker(), True, True)
+    
+    mlflow.log_params(params)
+    for _ in all_comparisons:
+        mlflow.log_params(_)
+    mlflow.log_dict(model.get_settings_object(), "linker.json")
+    mlflow.pyfunc.log_model("linker", python_model=model)
+    
+    for name, chart in charts.items():
+        model._log_chart(name, chart)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC We can click into the experiment tab on the right, or directly on the experiment hyperlink under the cell above to investigate the outputs of our Splink training.
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### Loading a model from MLFlow
+# MAGIC 
+# MAGIC Identify your run ID and replace the string below to load a linker model from the experiment. We'll demonstrate making predictions with a trained model from MLFlow below.
+
+# COMMAND ----------
+
+run_id = "<your-run-id>"
+loaded_model = mlflow.pyfunc.load_model("runs:/9d645178340c41d59f1d4d6881ae54cd/linker")
+
+# COMMAND ----------
+
+splink_results = loaded_model.predict(data)
+splink_results.as_spark_dataframe().display()
