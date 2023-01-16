@@ -67,8 +67,8 @@ from splink.spark.spark_linker import SparkLinker
 from splink.databricks.enable_splink import enable_splink
 import splink.spark.spark_comparison_library as cl
 
-from .utils.splink_linker_model import SplinkLinkerModel
-from .utils.mlflow_utils import *
+from utils.splink_linker_model import SplinkLinkerModel
+from utils.mlflow_utils import *
 import mlflow
 
 # COMMAND ----------
