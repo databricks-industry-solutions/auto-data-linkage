@@ -69,6 +69,7 @@ import splink.spark.spark_comparison_library as cl
 
 from utils.splink_linker_model import SplinkLinkerModel
 from utils.mlflow_utils import *
+
 import mlflow
 
 # COMMAND ----------
@@ -125,7 +126,10 @@ enable_splink(spark)
 
 # COMMAND ----------
 
-data = spark.read.table(f"splink_{db_name}.companies_with_officers")
+# data = spark.read.table(f"splink_{db_name}.companies_with_officers")
+table_name = "companies_with_officers"
+table_path = f"dbfs:/Filestore/Users/{username}/{table_name}"
+data = spark.read.load(table_path)
 
 # COMMAND ----------
 
@@ -429,12 +433,6 @@ linker_model.get_linker().estimate_parameters_using_expectation_maximisation(tra
 
 # COMMAND ----------
 
-# lev(A, a) is 1 -> standardise all text to lowercase 
-from pyspark.sql import functions as F
-data.withColumn("test", F.levenshtein(F.lit("A"), F.lit("a"))).display()
-
-# COMMAND ----------
-
 training_rule = "l.surname = r.surname and l.forenames = r.forenames"
 
 # COMMAND ----------
@@ -526,13 +524,22 @@ with mlflow.start_run() as run:
 
 # COMMAND ----------
 
+# MAGIC %md
+# MAGIC We can click into the experiment tab on the right, or directly on the experiment hyperlink under the cell above to investigate the outputs of our Splink training.
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### Loading a model from MLFlow
+# MAGIC 
+# MAGIC Identify your run ID and replace the string below to load a linker model from the experiment. We'll demonstrate making predictions with a trained model from MLFlow below.
+
+# COMMAND ----------
+
+run_id = "<your-run-id>"
 loaded_model = mlflow.pyfunc.load_model("runs:/9d645178340c41d59f1d4d6881ae54cd/linker")
 
 # COMMAND ----------
 
 splink_results = loaded_model.predict(data)
 splink_results.as_spark_dataframe().display()
-
-# COMMAND ----------
-
-
