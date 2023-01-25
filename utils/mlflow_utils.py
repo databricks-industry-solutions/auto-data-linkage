@@ -7,6 +7,7 @@ from sklearn.mixture import GaussianMixture
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.stats as ss
+import networkx as nx
 
 from splink.charts import save_offline_chart
 
@@ -136,10 +137,12 @@ def get_match_probabilty_loss(predictions):
     mlflow.autolog(disable=False)
     
     # Get means, variances and standard deviations
-    mean_1 = gm.means_[0][0]
-    mean_2 = gm.means_[1][0]
-    cov_1 = gm.covariances_[0][0][0]
-    cov_2 = gm.covariances_[1][0][0]
+    first_gauss = np.argmin(np.array([i[0] for i in gm.means_]))
+    second_gauss = np.argmax(np.array([i[0] for i in gm.means_]))
+    mean_1 = gm.means_[first_gauss][0]
+    mean_2 = gm.means_[second_gauss][0]
+    cov_1 = gm.covariances_[first_gauss][0][0]
+    cov_2 = gm.covariances_[second_gauss][0][0]
     std_1 = math.sqrt(cov_1)
     std_2 = math.sqrt(cov_2)
 
@@ -169,3 +172,40 @@ def get_match_probabilty_loss(predictions):
     ax.set_title("Probability density of predictions and fitted parameters")
     
     return prediction_purity, fig
+
+# ======================================================================
+# ======================================================================
+def visualise_linked_records(preds, min_linked_records=10, linkage_threshold=0.9):
+    '''
+    Visualises the connected components of inter-linked records
+    Parameters
+    ----------
+    preds: pandas.DataFrame, df of predictions that must contain the match_probabilty column
+    min_linked_records: 
+    Returns
+        A 2-tuple of the loss (float) and a chart (matplotlib.pyplot.figure) of the distribution and the fit
+    '''
+
+    preds = preds[preds["match_probability"]>=linkage_threshold]
+    G = nx.from_pandas_edgelist(
+      df=preds,
+      source="uid_l",
+      target="uid_r",
+
+    )
+    for component in list(nx.connected_components(G)):
+      if len(component)<min_linked_records:
+        for node in component:
+          G.remove_node(node)
+
+    labeldict = {}
+    for i, row in preds.iterrows():
+      if row["uid_r"] in G.nodes():
+        labeldict.update({row["uid_r"]: row["name_r"]})
+      if row["uid_l"] in G.nodes():
+        labeldict.update({row["uid_l"]: row["name_l"]})
+
+    plt.figure(figsize=(12, 12))
+    nx.draw(G, labels=labeldict, with_labels=True, node_size=10,font_size=5)
+    
+    return G.number_of_nodes()
