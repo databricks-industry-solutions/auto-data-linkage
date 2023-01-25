@@ -20,12 +20,12 @@ class SplinkLinkerModel(mlflow.pyfunc.PythonModel):
  
     def __init__(self, **kwargs):
         self.settings = {}
+        self.deterministic_rules = None
         for key, value in kwargs.items():
             setattr(self, key, value)
             
     def __getstate__(self):
         json_result = self.get_settings_object()
-        self.linker = None
         return json_result
             
     def __setstate__(self, json_dict):
@@ -66,6 +66,9 @@ class SplinkLinkerModel(mlflow.pyfunc.PythonModel):
         if self.linker:
             self.linker.initialise_settings(self.settings)
             
+    def set_deterministic_rules(self, rules):
+        self.deterministic_rules = rules
+            
     def set_stage1_columns(self, columns):
         self.stage1_columns = columns
         
@@ -97,22 +100,20 @@ class SplinkLinkerModel(mlflow.pyfunc.PythonModel):
         self.linker.estimate_parameters_using_expectation_maximisation(training_rule_1)
         self.linker.estimate_parameters_using_expectation_maximisation(training_rule_2)
         
-    def fit(self, X):
+    def fit(self, X, recall_prior=0.8):
         """
         Model training given input parameters and a training dataset.
         """
         if self.settings is None:
             raise Exception("Cannot initialise linker without settings being set. Please use model.set_settings.")
-        deterministic_rules = [
-          "l.name = r.name and levenshtein(r.date_of_birth, l.date_of_birth) <= 1",
-          "l.address_line_1 = r.address_line_1 and levenshtein(l.name, r.name) <= 5",
-          "l.name = r.name and levenshtein(l.address_line_1, r.address_line_1) <= 5",
-        ]
+        if not self.deterministic_rules:
+            raise Exception("Cannot initialise linker without setting deterministic rules. Please use model.set_deterministic_rules.")
+        
       
         linker = self.spark_linker(X)
         linker.initialise_settings(self.settings)
         self.set_spark_linker(linker)
-        self.estimate_random_match_probability(deterministic_rules, 0.8)
+        self.estimate_random_match_probability(self.deterministic_rules, recall_prior)
         self.estimate_u(self.target_rows)
         self.estimate_m(X, self.stage1_columns, self.stage2_columns)
         return linker
@@ -171,8 +172,8 @@ class SplinkLinkerModel(mlflow.pyfunc.PythonModel):
         """
         Predict labels on provided data
         """
-        linker = self.spark_linker(X)
-        linker.initialise_settings(self.settings)
-        result = linker.predict()
+        self.linker = self.spark_linker(X)
+        self.linker.initialise_settings(self.settings)
+        result = self.linker.predict()
         return result
     
