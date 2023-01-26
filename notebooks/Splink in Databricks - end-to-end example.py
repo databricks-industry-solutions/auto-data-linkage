@@ -123,6 +123,13 @@ enable_splink(spark)
 # MAGIC ### Loading and inspecting the data
 # MAGIC 
 # MAGIC We use spark to load the Delta table where the data resides.
+# MAGIC 
+# MAGIC > Note: The setup code in the next cell copies the data from a shared location to your user directory, so you can work with it in isolation from other hackers. 
+
+# COMMAND ----------
+
+# MAGIC %run 
+# MAGIC ../setup/data-setup
 
 # COMMAND ----------
 
