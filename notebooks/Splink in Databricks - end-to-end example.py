@@ -61,21 +61,9 @@ db_name
 from splink.spark.spark_linker import SparkLinker
 from splink.databricks.enable_splink import enable_splink
 import splink.spark.spark_comparison_library as cl
-from splink.mlflow import splink_mlflow
+from utils.mlflow import splink_mlflow
 
 import mlflow
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ### Setting up a working catalog and database
-# MAGIC 
-# MAGIC We'll create a catalog and a schema for our working tables and results and to make use of Databricks' [Unity Catalog](https://www.databricks.com/product/unity-catalog) unified data governance tool. We'll be writing SQL for this; note the magic command at the top of the cell. We print out the tables in the schema to check that it's empty.
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ### Setting up an MLFlow experiment to log our model to.
 
 # COMMAND ----------
 
@@ -409,7 +397,7 @@ training_rule = "l.name = r.name and l.date_of_birth = r.date_of_birth"
 
 # COMMAND ----------
 
-linkerestimate_parameters_using_expectation_maximisation(training_rule)
+linker.estimate_parameters_using_expectation_maximisation(training_rule)
 
 # COMMAND ----------
 
@@ -446,7 +434,7 @@ linker.m_u_parameters_chart()
 
 # COMMAND ----------
 
-predictions = linker.predict(threshold_match_probability=0.0)
+predictions = linker.predict()
 pdf_predictions = predictions.as_pandas_dataframe()
 spark.createDataFrame(pdf_predictions).display()
 
@@ -469,3 +457,9 @@ linker.waterfall_chart(dict_predictions)
 # MAGIC ### Saving our results to an MLFlow experiment
 # MAGIC 
 # MAGIC Splink integrates with [MLFlow](https://mlflow.org/), which is an open source end-to-end ML lifecycle management tool that is also available in Databricks as a managed service. With one line, we can log our model, results and artifacts to an MLFlow experiment for later re-use and comparison with other runs.
+
+# COMMAND ----------
+
+ # Log model and parameters
+with mlflow.start_run() as run:
+    splink_mlflow.log_splink_model_to_mlflow(run, linker, "linker")
