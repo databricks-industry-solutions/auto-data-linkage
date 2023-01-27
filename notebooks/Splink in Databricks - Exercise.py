@@ -4,11 +4,7 @@
 
 # COMMAND ----------
 
-#%pip install splink --quiet
-
-# COMMAND ----------
-
-pip install git+https://github.com/robertwhiffin/splink.git@mllfow-integration
+# MAGIC %pip install splink --quiet
 
 # COMMAND ----------
 
@@ -21,12 +17,14 @@ from splink.spark.spark_linker import SparkLinker
 from splink.databricks.enable_splink import enable_splink
 import splink.spark.spark_comparison_library as cl
 
+
 import pandas as pd
 
 from IPython.display import IFrame
 
 from utils.splink_linker_model import SplinkLinkerModel
 from utils.mlflow_utils import *
+from utils.mlflow import splink_mlflow
 
 import mlflow
 
@@ -43,7 +41,8 @@ db_name
 
 # COMMAND ----------
 
-spark.sql(f"CREATE DATABASE IF NOT EXISTS {db_name}; USE {db_name};")
+spark.sql(f"CREATE DATABASE IF NOT EXISTS {db_name}")
+spark.sql(f"USE {db_name}")
 
 # COMMAND ----------
 
@@ -66,21 +65,6 @@ spark.sql(f"CREATE DATABASE IF NOT EXISTS {db_name}; USE {db_name};")
 
 # COMMAND ----------
 
-
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Enabling Splink
-# MAGIC 
-# MAGIC As before, let's enable Splink for our notebook
-
-# COMMAND ----------
-
-enable_splink(spark)
-
-# COMMAND ----------
-
 # MAGIC %md
 # MAGIC ## Getting the data (again)
 # MAGIC 
@@ -88,10 +72,14 @@ enable_splink(spark)
 
 # COMMAND ----------
 
-# DBTITLE 1,FIX AFTER WE AGREE ON DATA LOCATION
-# data = spark.read.table(f"splink_{db_name}.companies_with_officers")
+# MAGIC %run
+# MAGIC ../setup/data-setup
+
+# COMMAND ----------
+
 table_name = "companies_with_officers"
-data = spark.read.format("delta").load(f"dbfs:/Filestore/Users/{username}/{table_name}")
+table_path = f"/mnt/source/splinkdata/delta/{table_name}"
+data = spark.read.load(table_path)
 
 # COMMAND ----------
 
@@ -126,6 +114,7 @@ blocking_rules_to_generate_predictions = [
   "l.nationality = r.nationality and l.locality = r.locality and l.premises = r.premises and l.region = r.region",
   "l.address_line_1 = r.address_line_1 and l.postal_code = r.postal_code and l.surname = r.surname",
 ]
+
 comparisons = [
   cl.levenshtein_at_thresholds("surname", 10),
   cl.levenshtein_at_thresholds("forenames", 10),
@@ -133,20 +122,27 @@ comparisons = [
   cl.levenshtein_at_thresholds("country_of_residence", 1),
   cl.levenshtein_at_thresholds("nationality", 2)
 ]
+
 deterministic_rules = [
   "l.name = r.name and levenshtein(r.date_of_birth, l.date_of_birth) <= 1",
   "l.address_line_1 = r.address_line_1 and levenshtein(l.name, r.name) <= 5",
   "l.name = r.name and levenshtein(l.address_line_1, r.address_line_1) <= 5",
 ]
+
 settings = {
   "retain_intermediate_calculation_columns": True,
   "retain_matching_columns": True,
   "link_type": "dedupe_only",
   "unique_id_column_name": "uid",
+  "comparisons": comparisons,
   "em_convergence": 0.01,
   "blocking_rules_to_generate_predictions": blocking_rules_to_generate_predictions
 }
 
+training_rules = [
+  "l.name = r.name and l.date_of_birth = r.date_of_birth",
+  "l.surname = r.surname and l.forenames = r.forenames"
+]
 
 # COMMAND ----------
 
@@ -165,40 +161,19 @@ with mlflow.start_run() as run:
   RUN_ID = run.info.run_id
 
   # Train linker model
-  model = SplinkLinkerModel()
-  model.spark_linker(data)
-  model.set_settings(settings)
-  model.set_deterministic_rules(deterministic_rules)
-  model.set_blocking_rules(blocking_rules_to_generate_predictions)
-  model.set_comparisons(comparisons)
-  model.set_target_rows(1e7)
-  model.set_stage1_columns(["name", "date_of_birth"])
-  model.set_stage2_columns(["surname", "forenames"])
-  model.fit(data)
+  linker = SparkLinker(data, spark=spark)
+  linker.initialise_settings(settings)
+  linker.estimate_probability_two_random_records_match(deterministic_rules, recall=0.8)
+  linker.estimate_u_using_random_sampling(target_rows=1e7)
+  for training_rule in training_rules:
+    linker.estimate_parameters_using_expectation_maximisation(training_rule)
+  
+  # Log model and parameters
+  splink_mlflow.log_splink_model_to_mlflow(run, linker, "linker")
 
-  # Make predictions on the data
-  predictions = model.get_linker().predict().as_pandas_dataframe()
-
-  # Log model settings as JSON to MLflow run
-  model.log_settings_as_json("linker_settings.json")
-
-  # Log parameters to MLflow
-  params = get_hyperparameters(model.get_settings_object())
-  all_comparisons = get_all_comparisons(model.get_settings_object())
-  charts = get_linker_charts(model.get_linker(), True, True)
-
-  mlflow.log_params(params)
-  for _ in all_comparisons:
-      mlflow.log_params(_)
-  mlflow.log_dict(model.get_settings_object(), "linker.json")
-
-  # Log model to MLflow
-  mlflow.pyfunc.log_model("linker", python_model=model)
-
-  # Log Charts to MLflow
-  for name, chart in charts.items():
-      model._log_chart(name, chart)
-
+  # Make predictions
+  predictions = linker.predict().as_pandas_dataframe()
+  
   # Evaluate linker model and log loss as metric
   loss, fig = get_match_probabilty_loss(predictions)
   mlflow.log_metric("match_probability_loss", loss)
@@ -213,21 +188,8 @@ with mlflow.start_run() as run:
 
 # COMMAND ----------
 
-baseline_linker = model.linker
+baseline_linker = linker
 baseline_linker.m_u_parameters_chart()
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC As above, we can use this `loaded_linker` to use Splink's functionality:
-
-# COMMAND ----------
-
-df_clusters = baseline_linker.cluster_pairwise_predictions_at_threshold(baseline_linker.predict(), 0.9)
-df_predictions = baseline_linker.predict()
-baseline_linker.cluster_studio_dashboard(df_predictions, df_clusters, "cluster_studio.html", sampling_method="by_cluster_size", overwrite=True)
-
-IFrame(src="./cluster_studio.html", width="100%", height=1200)
 
 # COMMAND ----------
 
