@@ -36,11 +36,6 @@
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC To decouple from Rob's fork. 
-
-# COMMAND ----------
-
 # MAGIC %pip install splink --quiet
 
 # COMMAND ----------
@@ -66,22 +61,9 @@ db_name
 from splink.spark.spark_linker import SparkLinker
 from splink.databricks.enable_splink import enable_splink
 import splink.spark.spark_comparison_library as cl
-
-from utils.splink_linker_model import SplinkLinkerModel
-from utils.mlflow_utils import *
+from splink.mlflow import splink_mlflow
 
 import mlflow
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ### Enabling Splink
-# MAGIC 
-# MAGIC We then enable Splink on Databricks with just one line of code. Note that the method takes in a `spark` instance as its only argument which is automatically created in a Databricks notebook, so we don't need to define it ourselves.
-
-# COMMAND ----------
-
-enable_splink(spark)
 
 # COMMAND ----------
 
@@ -123,19 +105,16 @@ enable_splink(spark)
 # MAGIC ### Loading and inspecting the data
 # MAGIC 
 # MAGIC We use spark to load the Delta table where the data resides.
-# MAGIC 
-# MAGIC > Note: The setup code in the next cell copies the data from a shared location to your user directory, so you can work with it in isolation from other hackers. 
 
 # COMMAND ----------
 
-# MAGIC %run 
+# MAGIC %run
 # MAGIC ../setup/data-setup
 
 # COMMAND ----------
 
-# data = spark.read.table(f"splink_{db_name}.companies_with_officers")
 table_name = "companies_with_officers"
-table_path = f"dbfs:/Filestore/Users/{username}/{table_name}"
+table_path = f"/mnt/source/splinkdata/delta/{table_name}"
 data = spark.read.load(table_path)
 
 # COMMAND ----------
@@ -179,8 +158,7 @@ data.filter("uid = 23636 OR uid = 122382").display()
 
 # COMMAND ----------
 
-linker_model = SplinkLinkerModel()
-linker_model.spark_linker(data)
+linker = SparkLinker(data, spark=spark)
 
 # COMMAND ----------
 
@@ -189,7 +167,7 @@ linker_model.spark_linker(data)
 
 # COMMAND ----------
 
-linker_model.get_linker().missingness_chart()
+linker.missingness_chart()
 
 # COMMAND ----------
 
@@ -202,11 +180,11 @@ data.columns
 
 # COMMAND ----------
 
-linker_model.get_linker().profile_columns("nationality")
+linker.profile_columns("nationality")
 
 # COMMAND ----------
 
-linker_model.get_linker().profile_columns("postal_code")
+linker.profile_columns("postal_code")
 
 # COMMAND ----------
 
@@ -286,11 +264,11 @@ settings = {
   "blocking_rules_to_generate_predictions": blocking_rules_to_generate_predictions
 }
 
-linker_model.set_settings(settings)
+linker.initialise_settings(settings)
 
 # COMMAND ----------
 
-linker_model.get_linker().cumulative_num_comparisons_from_blocking_rules_chart(blocking_rules_to_generate_predictions)
+linker.cumulative_num_comparisons_from_blocking_rules_chart(blocking_rules_to_generate_predictions)
 
 # COMMAND ----------
 
@@ -362,7 +340,9 @@ comparisons = [
 
 # COMMAND ----------
 
-linker_model.set_comparisons(comparisons)
+settings.update({"comparisons": comparisons})
+
+linker.initialise_settings(settings)
 
 # COMMAND ----------
 
@@ -391,7 +371,7 @@ deterministic_rules = [
 
 # COMMAND ----------
 
-linker_model.estimate_random_match_probability(deterministic_rules, recall=0.8)
+linker.estimate_probability_two_random_records_match(deterministic_rules, recall=0.8)
 
 # COMMAND ----------
 
@@ -409,7 +389,7 @@ linker_model.estimate_random_match_probability(deterministic_rules, recall=0.8)
 
 # COMMAND ----------
 
-linker_model.estimate_u(target_rows=1e7)
+linker.estimate_u_using_random_sampling(target_rows=1e7)
 
 # COMMAND ----------
 
@@ -425,13 +405,11 @@ linker_model.estimate_u(target_rows=1e7)
 
 # COMMAND ----------
 
-# change the surname and forname so that distace dont complain
-#remove name from here
 training_rule = "l.name = r.name and l.date_of_birth = r.date_of_birth"
 
 # COMMAND ----------
 
-linker_model.get_linker().estimate_parameters_using_expectation_maximisation(training_rule)
+linkerestimate_parameters_using_expectation_maximisation(training_rule)
 
 # COMMAND ----------
 
@@ -444,16 +422,7 @@ training_rule = "l.surname = r.surname and l.forenames = r.forenames"
 
 # COMMAND ----------
 
-linker_model.get_linker().estimate_parameters_using_expectation_maximisation(training_rule)
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC SplinkLinkerModel also provides randomised 2 stage m estimation.
-
-# COMMAND ----------
-
-linker_model.estimate_m(data, ["name", "date_of_birth"], ["surname", "forenames"])
+linker.estimate_parameters_using_expectation_maximisation(training_rule)
 
 # COMMAND ----------
 
@@ -464,7 +433,7 @@ linker_model.estimate_m(data, ["name", "date_of_birth"], ["surname", "forenames"
 
 # COMMAND ----------
 
-linker_model.get_linker().m_u_parameters_chart()
+linker.m_u_parameters_chart()
 
 # COMMAND ----------
 
@@ -477,7 +446,7 @@ linker_model.get_linker().m_u_parameters_chart()
 
 # COMMAND ----------
 
-predictions = linker_model.predict(None, data)
+predictions = linker.predict(threshold_match_probability=0.0)
 pdf_predictions = predictions.as_pandas_dataframe()
 spark.createDataFrame(pdf_predictions).display()
 
@@ -491,7 +460,7 @@ spark.createDataFrame(pdf_predictions).display()
 # COMMAND ----------
 
 dict_predictions = predictions.as_record_dict(limit=20)
-linker_model.get_linker().waterfall_chart(dict_predictions)
+linker.waterfall_chart(dict_predictions)
 
 
 # COMMAND ----------
@@ -500,53 +469,3 @@ linker_model.get_linker().waterfall_chart(dict_predictions)
 # MAGIC ### Saving our results to an MLFlow experiment
 # MAGIC 
 # MAGIC Splink integrates with [MLFlow](https://mlflow.org/), which is an open source end-to-end ML lifecycle management tool that is also available in Databricks as a managed service. With one line, we can log our model, results and artifacts to an MLFlow experiment for later re-use and comparison with other runs.
-
-# COMMAND ----------
-
-with mlflow.start_run() as run:
-    model = SplinkLinkerModel()
-    model.spark_linker(data.limit(100))
-    model.set_settings(settings)
-    model.set_blocking_rules(blocking_rules_to_generate_predictions)
-    model.set_comparisons(comparisons)
-    model.set_target_rows(1e7)
-    model.set_stage1_columns(["name", "date_of_birth"])
-    model.set_stage2_columns(["surname", "forenames"])
-    
-    model.fit(data)
-    model.log_settings_as_json("linker_settings.json")
-    
-    params = get_hyperparameters(model.get_settings_object())
-    all_comparisons = get_all_comparisons(model.get_settings_object())
-    charts = get_linker_charts(model.get_linker(), True, True)
-    
-    mlflow.log_params(params)
-    for _ in all_comparisons:
-        mlflow.log_params(_)
-    mlflow.log_dict(model.get_settings_object(), "linker.json")
-    mlflow.pyfunc.log_model("linker", python_model=model)
-    
-    for name, chart in charts.items():
-        model._log_chart(name, chart)
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC We can click into the experiment tab on the right, or directly on the experiment hyperlink under the cell above to investigate the outputs of our Splink training.
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ### Loading a model from MLFlow
-# MAGIC 
-# MAGIC Identify your run ID and replace the string below to load a linker model from the experiment. We'll demonstrate making predictions with a trained model from MLFlow below.
-
-# COMMAND ----------
-
-run_id = "<your-run-id>"
-loaded_model = mlflow.pyfunc.load_model("runs:/9d645178340c41d59f1d4d6881ae54cd/linker")
-
-# COMMAND ----------
-
-splink_results = loaded_model.predict(data)
-splink_results.as_spark_dataframe().display()
