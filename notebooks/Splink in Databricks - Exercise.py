@@ -169,7 +169,7 @@ with mlflow.start_run() as run:
     linker.estimate_parameters_using_expectation_maximisation(training_rule)
   
   # Log model and parameters
-  splink_mlflow.log_splink_model_to_mlflow(run, linker, "linker")
+  splink_mlflow.log_splink_model_to_mlflow(linker, "linker")
 
   # Make predictions
   predictions = linker.predict()

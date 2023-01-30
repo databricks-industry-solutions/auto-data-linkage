@@ -132,7 +132,7 @@ def _save_splink_model_to_mlflow(linker, model_name):
 
 # ======================================================================
 # ======================================================================
-def log_splink_model_to_mlflow(run, linker, model_name, log_parameters_charts=True,
+def log_splink_model_to_mlflow(linker, model_name, log_parameters_charts=True,
                                log_profiling_charts=False, params=None, metrics=None, artifacts=None):
     """
     Comprehensive logging of Splink attributes, parameters, charts and model JSON to MLFlow to provide easy
@@ -165,22 +165,22 @@ def log_splink_model_to_mlflow(run, linker, model_name, log_parameters_charts=Tr
 
     splink_model_json = linker._settings_obj.as_dict()
 
-    with run:
-        _log_splink_model_json(splink_model_json)
-        _log_hyperparameters(splink_model_json)
-        _log_comparisons(splink_model_json)
-        #_save_splink_model_to_mlflow(linker, model_name)
-        model = SplinkMLFlowWrapper()
-        model.set_spark_linker(linker)
-        mlflow.pyfunc.log_model(model_name, python_model=model)
-        if log_profiling_charts or log_parameters_charts:
-            _log_linker_charts(linker, log_parameters_charts, log_profiling_charts)
-        if params:
-            mlflow.log_params(params)
-        if metrics:
-            mlflow.log_metrics(metrics)
-        if artifacts:
-            mlflow.log_artifacts(artifacts)
+   
+    _log_splink_model_json(splink_model_json)
+    _log_hyperparameters(splink_model_json)
+    _log_comparisons(splink_model_json)
+    #_save_splink_model_to_mlflow(linker, model_name)
+    model = SplinkMLFlowWrapper()
+    model.set_spark_linker(linker)
+    mlflow.pyfunc.log_model(model_name, python_model=model)
+    if log_profiling_charts or log_parameters_charts:
+        _log_linker_charts(linker, log_parameters_charts, log_profiling_charts)
+    if params:
+        mlflow.log_params(params)
+    if metrics:
+        mlflow.log_metrics(metrics)
+    if artifacts:
+        mlflow.log_artifacts(artifacts)
 
 
 
