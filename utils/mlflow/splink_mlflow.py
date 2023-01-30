@@ -5,6 +5,10 @@ import json
 
 from splink.charts import save_offline_chart
 
+from mlflow.models.signature import infer_signature
+from pyspark.sql import SparkSession
+from splink.spark.spark_linker import SparkLinker
+
 # ======================================================================
 # ======================================================================
 def _log_comparison_details(comparison):
@@ -165,7 +169,10 @@ def log_splink_model_to_mlflow(run, linker, model_name, log_parameters_charts=Tr
         _log_splink_model_json(splink_model_json)
         _log_hyperparameters(splink_model_json)
         _log_comparisons(splink_model_json)
-        _save_splink_model_to_mlflow(linker, model_name)
+        #_save_splink_model_to_mlflow(linker, model_name)
+        model = SplinkMLFlowWrapper()
+        model.set_spark_linker(linker)
+        mlflow.pyfunc.log_model(model_name, python_model=model)
         if log_profiling_charts or log_parameters_charts:
             _log_linker_charts(linker, log_parameters_charts, log_profiling_charts)
         if params:
@@ -271,3 +278,67 @@ def get_model_json(artifact_uri):
     shutil.rmtree(temp_file_path)
 
     return linker_json
+
+# ======================================================================
+# ======================================================================
+class SplinkMLFlowWrapper(mlflow.pyfunc.PythonModel):
+    """
+    MLFlow compatibility wrapper for splink linker.
+    """
+ 
+    def __init__(self, **kwargs):
+        self.settings = {}
+        self.linker = None
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+            
+    def __getstate__(self):
+        json_result = self.get_settings_object()
+        return json_result
+            
+    def __setstate__(self, json_dict):
+        self.settings = json_dict
+    
+    def load_context(self, context):
+        # this simply stores the json with the MLFLow model.
+        self.context = context
+        
+    def clear_context(self):
+        # model cannot be pickled, so disposing it
+        self.linker.spark = None
+        
+    def set_should_evaluate(self, flag):
+        self.should_evaluate = flag
+        
+    def spark_linker(self, data):
+        spark = SparkSession.builder.getOrCreate()
+        self.linker = SparkLinker(data, spark=spark)
+        spark = None
+        return self.linker
+        
+    def set_spark_linker(self, linker: SparkLinker):
+        self.linker = linker
+    
+    def set_settings(self, settings):
+        self.settings = settings
+        if self.linker:
+            self.linker.initialise_settings(self.settings)
+        
+    def get_linker(self):
+        return self.linker
+    
+    def get_settings(self):
+        return self.settings
+   
+    def get_settings_object(self):
+        return self.get_linker()._settings_obj.as_dict()
+    
+ 
+    def predict(self, context, X):
+        """
+        Predict labels on provided data
+        """
+        self.linker = self.spark_linker(X)
+        self.linker.initialise_settings(self.settings)
+        result = self.linker.predict()
+        return result
