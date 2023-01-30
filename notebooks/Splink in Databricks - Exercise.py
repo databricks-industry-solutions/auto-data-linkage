@@ -36,7 +36,7 @@ import mlflow
 # COMMAND ----------
 
 username = spark.sql('select current_user() as user').collect()[0]['user']
-db_name = username.replace(".", "_").replace("@", "_")
+db_name = username.replace(".", "_").replace("@", "_").replace("-","_")
 db_name
 
 # COMMAND ----------
