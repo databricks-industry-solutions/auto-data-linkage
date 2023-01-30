@@ -468,7 +468,7 @@ linker.waterfall_chart(dict_predictions)
 
  # Log model and parameters
 with mlflow.start_run() as run:
-    splink_mlflow.log_splink_model_to_mlflow(run, linker, "linker")
+    splink_mlflow.log_splink_model_to_mlflow(linker, "linker")
 
 # COMMAND ----------
 
