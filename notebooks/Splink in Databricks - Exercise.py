@@ -172,12 +172,31 @@ with mlflow.start_run() as run:
   splink_mlflow.log_splink_model_to_mlflow(run, linker, "linker")
 
   # Make predictions
-  predictions = linker.predict().as_pandas_dataframe()
+  predictions = linker.predict()
   
   # Evaluate linker model and log loss as metric
-  loss, fig = get_match_probabilty_loss(predictions)
+  loss, fig = get_match_probabilty_loss(predictions.as_pandas_dataframe())
   mlflow.log_metric("match_probability_loss", loss)
   mlflow.log_figure(fig, 'prediction_distribution_loss.png')
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC 
+# MAGIC Splink gives us the likelihood that a pair of records are the same, and also the clusters that are created by following the chain of pairs. If A&B are the same, and B&C are the same, then A&B&C are the same. This is a cluster.
+
+# COMMAND ----------
+
+# pairwise predictions
+predictions.as_pandas_dataframe(limit=10)
+
+# COMMAND ----------
+
+# Creating the clusters requires setting a confidence threshold to indicate the degree of similarity between pairs. 
+# If A&B have a 90% chance of the being the sae, and B&C a 10% chance, we don't want to connect A&B&C.
+
+clusters = linker.cluster_pairwise_predictions_at_threshold(predictions, threshold_match_probability=0.5)
+clusters.as_pandas_dataframe(limit=10)
 
 # COMMAND ----------
 
@@ -188,8 +207,7 @@ with mlflow.start_run() as run:
 
 # COMMAND ----------
 
-baseline_linker = linker
-baseline_linker.m_u_parameters_chart()
+linker.m_u_parameters_chart()
 
 # COMMAND ----------
 
@@ -198,9 +216,33 @@ baseline_linker.m_u_parameters_chart()
 
 # COMMAND ----------
 
-baseline_loss, baseline_fig = get_match_probabilty_loss(df_predictions.as_pandas_dataframe())
+baseline_loss, baseline_fig = get_match_probabilty_loss(predictions.as_pandas_dataframe())
 
 baseline_loss
+
+# COMMAND ----------
+
+path=f"/dbfs/Users/{username}/clusters.html"
+
+
+linker.cluster_studio_dashboard(predictions, clusters, path, sampling_method="by_cluster_size", overwrite=True)
+
+
+with open(path, "r") as f:
+    html2=f.read()
+    
+displayHTML(html2)
+
+# COMMAND ----------
+
+path=f"/dbfs/Users/{username}/scv.html"
+
+linker.comparison_viewer_dashboard(predictions, path, overwrite=True)
+
+with open(path, "r") as f:
+    html=f.read()
+    
+displayHTML(html)
 
 # COMMAND ----------
 
@@ -211,7 +253,7 @@ baseline_loss
 
 # COMMAND ----------
 
-visualise_linked_records(predictions, min_linked_records=10, linkage_threshold=0.9)
+visualise_linked_records(predictions.as_pandas_dataframe(), min_linked_records=10, linkage_threshold=0.9)
 
 # COMMAND ----------
 
@@ -228,3 +270,4 @@ visualise_linked_records(predictions, min_linked_records=10, linkage_threshold=0
 # MAGIC 5. Submit new runs to your experiment. Track how the loss evolves with your different trials on the experiments page.
 # MAGIC 6. Try and de-duplicate your data based on the clusters that you find.
 # MAGIC 6. **If you need any help at all, reach out to a TA!**
+# MAGIC 7. Prepare 1 slide for show and tell at the end of the hack.

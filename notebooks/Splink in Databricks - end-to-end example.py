@@ -226,7 +226,7 @@ linker.profile_columns("postal_code")
 # MAGIC %md
 # MAGIC #### 1. Blocking rules for predictions
 # MAGIC 
-# MAGIC If we were to compare every record in our dataset against every other record, we would be looking at making over 26 _billion_ estimates. Splink allows you to greatly reduce this comparison space by implementing _blocking rules_ that basically constrain how two records must relate to each other in order to even be considered a potential match.
+# MAGIC If we were to compare every record in our dataset against every other record, we would be looking at making over 26 _billion_ estimates. Splink allows you to greatly reduce this comparison space by implementing _blocking rules_ that basically constrain how two records must relate to each other in order to even be considered a potential match. A blocking rule is formulated as a SQL expression, and can be arbitrarily complex. For example, you could create record comparisons where the initial of the first name and the surname match. [This page](https://moj-analytical-services.github.io/splink/demos/03_Blocking.html) goes into more detail about blocking rules and their use.
 # MAGIC 
 # MAGIC To demonstrate this, we'll set up three rules:
 # MAGIC 1. Full name and date of birth are an exact match
@@ -242,6 +242,19 @@ blocking_rules_to_generate_predictions = [
   "l.nationality = r.nationality and l.locality = r.locality and l.premises = r.premises and l.region = r.region",
   "l.address_line_1 = r.address_line_1 and l.postal_code = r.postal_code and l.surname = r.surname",
 ]
+
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC We can visualise these blocking rules using a built-in method within Splink by adding the rules as a setting to our `linker` object. Additionally, we'll define a few more settings that will help us later:
+# MAGIC * `retain_intermediate_calculation_columns` and `retain_matching_columns` are to allow us to visualise the predictions at the end
+# MAGIC * `link_type` is set to only deduplicate (as opposed to link multiple datasets) as we only have one dataset we're trying to deduplicate
+# MAGIC * `unique_id_column_name` tells Splink the unique identifier column of our dataset
+# MAGIC * `em_convergence` is setting a convergence threshold expectation-maximalisation algorithm
+
+# COMMAND ----------
+
 
 settings = {
   "retain_intermediate_calculation_columns": True,
@@ -262,16 +275,7 @@ linker.cumulative_num_comparisons_from_blocking_rules_chart(blocking_rules_to_ge
 
 # MAGIC %md
 # MAGIC 
-# MAGIC Here we confirm the 140,000 number I quoted above, with our second rule contributing the most to the total number of comparisons.
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC We can visualise these blocking rules using a built-in method within Splink by adding the rules as a setting to our `linker` object. Additionally, we'll define a few more settings that will help us later:
-# MAGIC * `retain_intermediate_calculation_columns` and `retain_matching_columns` are to allow us to visualise the predictions at the end
-# MAGIC * `link_type` is set to only deduplicate (as opposed to link multiple datasets) as we only have one dataset we're trying to deduplicate
-# MAGIC * `unique_id_column_name` tells Splink the unique identifier column of our dataset
-# MAGIC * `em_convergence` is setting a convergence threshold expectation-maximalisation algorithm
+# MAGIC Here we confirm the 140,000 number quoted above, with our second rule contributing the most to the total number of comparisons.
 
 # COMMAND ----------
 
