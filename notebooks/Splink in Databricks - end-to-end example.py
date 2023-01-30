@@ -461,9 +461,41 @@ linker.waterfall_chart(dict_predictions)
 # MAGIC ### Saving our results to an MLFlow experiment
 # MAGIC 
 # MAGIC Splink integrates with [MLFlow](https://mlflow.org/), which is an open source end-to-end ML lifecycle management tool that is also available in Databricks as a managed service. With one line, we can log our model, results and artifacts to an MLFlow experiment for later re-use and comparison with other runs.
+# MAGIC 
+# MAGIC MLFlow also lets us store the model in a format that it can be used simply by a third party. 
 
 # COMMAND ----------
 
  # Log model and parameters
 with mlflow.start_run() as run:
     splink_mlflow.log_splink_model_to_mlflow(run, linker, "linker")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC 
+# MAGIC After the model is stored, the next step is to retrieve the model and use it - MLFlow uses standardised APIs - all that is necessary is to call `predict()` on the returned object.
+
+# COMMAND ----------
+
+run_id = run.info.run_id
+loaded_model = mlflow.pyfunc.load_model(f"runs:/{run_id}/linker")
+
+splink_results = loaded_model.predict(data)
+splink_results.as_spark_dataframe().display()
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC 
+# MAGIC MLFlow simplifies things by wrapping models in a layer of MLFlow - this provides a model agnostic approach, whereby one can completely replace the underlying model without impacting on downstream processes because those downstream processes are only calling `.predict()` on an MLFlow model. 
+# MAGIC 
+# MAGIC However, one can still access the underlying model, which means one can still access all of the built in Splink functions, with just a little bit of extra code. 
+# MAGIC 
+# MAGIC 
+# MAGIC (NB - the underlying Splink model only becomes available after it is used to make a prediction)
+
+# COMMAND ----------
+
+dict_predictions = splink_results.as_record_dict(limit=20)
+loaded_model.unwrap_python_model().linker.waterfall_chart(dict_predictions)
