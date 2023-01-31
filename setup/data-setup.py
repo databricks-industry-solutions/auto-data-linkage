@@ -34,7 +34,7 @@ df_company_officers = fetch_table("company_officers", reset=False)
 
 # COMMAND ----------
 
-display(dbutils.fs.ls(f"/Filestore/Users/{username}"))
+#display(dbutils.fs.ls(f"/Filestore/Users/{username}"))
 
 # COMMAND ----------
 
