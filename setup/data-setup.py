@@ -26,12 +26,11 @@ df_companies_with_officers.display()
 # COMMAND ----------
 
 df_payment_practices_of_uk_buyers = fetch_table("payment_practices_of_uk_buyers", reset=False)
-df_payment_practices_of_uk_buyers.display()
 
 # COMMAND ----------
 
 df_company_officers = fetch_table("company_officers", reset=False)
-df_company_officers.display()
+
 
 # COMMAND ----------
 
