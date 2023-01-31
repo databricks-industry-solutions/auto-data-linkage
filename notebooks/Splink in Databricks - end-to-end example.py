@@ -388,7 +388,7 @@ linker.estimate_u_using_random_sampling(target_rows=1e7)
 # MAGIC %md
 # MAGIC #### 2. Estimating the \\(m\\) probability
 # MAGIC 
-# MAGIC Recall that the \\(u\\) probability is the probability of observed values (which we now know are comparison levels \\(\gamma\\)) given that the records __do__ match. Without ground-truth labels, this can be estimated using the expectation-maximalisation algorithm with Splink's built-in `estimate_parameters_using_expectation_maximisation` method. For this, we need to run at least two passes of estimations, where we "fix" one or more columns and estimate \\(m\\) for the rest. We'll then need to fix other columns to estimate \\(m\\) for the first columns we fixed. Let's demonstrate:
+# MAGIC Recall that the \\(m\\) probability is the probability of observed values given that the records __do__ match. Without ground-truth labels, this can be estimated using the expectation-maximalisation algorithm with Splink's built-in `estimate_parameters_using_expectation_maximisation` method. For this, we need to run at least two passes of estimations, where we "fix" one or more columns and estimate \\(m\\) for the rest. We'll then need to fix other columns to estimate \\(m\\) for the first columns we fixed. Let's demonstrate:
 
 # COMMAND ----------
 
