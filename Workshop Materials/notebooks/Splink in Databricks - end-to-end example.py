@@ -16,6 +16,10 @@
 # MAGIC ***
 # MAGIC 
 # MAGIC In this Notebook we will walk through a simple example of setting up Splink on Databricks and applying it to a dataset.
+# MAGIC 
+# MAGIC ***
+# MAGIC 
+# MAGIC This notebook was tested on a cluster running the DBR 12.1 ML
 
 # COMMAND ----------
 
@@ -32,7 +36,7 @@
 # MAGIC %md
 # MAGIC ### Installing Splink
 # MAGIC 
-# MAGIC We'll start by `pip` installing Splink from a repository:
+# MAGIC We'll start by `pip` installing Splink:
 
 # COMMAND ----------
 
@@ -42,7 +46,7 @@
 
 # DBTITLE 1,Get current username
 username = spark.sql('select current_user() as user').collect()[0]['user']
-db_name = username.replace(".", "_").replace("@", "_")
+db_name = f"{username.replace('.', '_').replace('@', '_')}_splink_data"
 db_name
 
 # COMMAND ----------
@@ -59,7 +63,6 @@ db_name
 # COMMAND ----------
 
 from splink.spark.spark_linker import SparkLinker
-from splink.databricks.enable_splink import enable_splink
 import splink.spark.spark_comparison_library as cl
 from utils.mlflow import splink_mlflow
 
@@ -92,18 +95,20 @@ import mlflow
 # MAGIC %md
 # MAGIC ### Loading and inspecting the data
 # MAGIC 
-# MAGIC We use spark to load the Delta table where the data resides.
+# MAGIC We use spark to load the Delta table created by running the **Source data from Kaggle and Companies House** in the setup folder of this repo.
 
 # COMMAND ----------
 
-# MAGIC %run
-# MAGIC ../setup/data-setup
+# DBTITLE 1,Remove cached Splink tables
+#Splink has an issue where changes to the input data are not reflected in it's cached tables. Run this step after doing any feature engineering.
+x = spark.sql(f"show tables from {db_name} like '*__splink__*'").collect()
+for _ in x:
+  spark.sql(f"drop table {db_name}.{_.tableName}")
 
 # COMMAND ----------
 
-table_name = "companies_with_officers"
-table_path = f"/mnt/source/splinkdata/delta/{table_name}"
-data = spark.read.load(table_path)
+table_name = "cleansed_company_officers"
+data = spark.read.table(db_name+'.'+table_name)
 
 # COMMAND ----------
 
@@ -126,11 +131,11 @@ data.display()
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC As an example, take a look at these two records - it would be reasonable to suggest that these are the same people. But how do we indentify this without trawling through the thousands of entries we have?
+# MAGIC As an example, take a look at these records - it would be reasonable to suggest that these are the same people. But how do we indentify this without trawling through the thousands of entries we have?
 
 # COMMAND ----------
 
-data.filter("uid = 23636 OR uid = 122382").display()
+data.filter("surname = 'SCHOLTZ' and nationality = 'American'").display()
 
 # COMMAND ----------
 
@@ -146,7 +151,7 @@ data.filter("uid = 23636 OR uid = 122382").display()
 
 # COMMAND ----------
 
-linker = SparkLinker(data, spark=spark)
+linker = SparkLinker(data, spark=spark, database=db_name)
 
 # COMMAND ----------
 

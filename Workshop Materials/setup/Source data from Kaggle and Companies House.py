@@ -11,6 +11,10 @@
 # MAGIC This notebook requires you to have an account with Companies House and and a Companies House API key. Follow this [guide](https://www.pythonontoast.com/python-data-interface-companies-house/) in order to register with Companies House and generate an API key.
 # MAGIC 
 # MAGIC All data downloaded is written to DBFS in the path "/Users/*username*/...", and made available as Delta Tables in a database named *username*_splink_data
+# MAGIC 
+# MAGIC PS - creating the full extract takes about 7 hours to run.
+# MAGIC 
+# MAGIC PPS - tested on DBR 11.3 LTS
 
 # COMMAND ----------
 
@@ -41,9 +45,9 @@ dbutils.fs.mkdirs(download_path)
 # COMMAND ----------
 
 # MAGIC %sh
-# MAGIC rm -rf ~/.kaggle
+# MAGIC 
 # MAGIC mkdir ~/.kaggle
-# MAGIC #echo '{"username":<KAGGLE_USERNAME>,"key":<KAGGLE_API_KEY>}' > ~/.kaggle/kaggle.json
+# MAGIC echo '{"username":<KAGGLE_USERNAME>,"key":<KAGGLE_API_KEY>}' > ~/.kaggle/kaggle.json
 # MAGIC kaggle datasets download --force -d saikiran0684/payment-practices-of-uk-buyers -p /dbfs/Users/$USERNAME/datasets/kaggle/payment-practices-of-uk-buyers
 # MAGIC rm ~/.kaggle/kaggle.json
 # MAGIC cd /dbfs/Users/$USERNAME/datasets/kaggle/payment-practices-of-uk-buyers
@@ -56,26 +60,15 @@ dbutils.fs.mkdirs(download_path)
 
 # COMMAND ----------
 
-username
-
-# COMMAND ----------
-
-display(spark.read.format('csv').option("header", True)
-.load(f"dbfs:/Users/{username}/datasets/kaggle/payment-practices-of-uk-buyers/payment-practices.csv")
-        .select()
-)
-
-# COMMAND ----------
-
 database = f"{username.replace('.', '_').replace('@', '_')}_splink_data"
 spark.sql(f"create database if not exists {database}")
 df=(
 spark.read.format('csv').option("header", True)
 .load(f"dbfs:/Users/{username}/datasets/kaggle/payment-practices-of-uk-buyers/payment-practices.csv")
 )
-# need to rename to get rid of spaces and percentanges
 
 
+# need to rename columns to get rid of spaces and percentanges
 new_columns = [x.replace(" ", "_").replace("%", "percentage").replace("-", "_").replace("(", "").replace(")", "") for x in df.columns]
 new_df=df.toDF(*new_columns)
 (new_df
@@ -108,8 +101,7 @@ from pyspark.sql.functions import collect_set, size
 
 # COMMAND ----------
 
-#key = <'auth key'>
-key=f'cae3d31a-ae90-42eb-a98c-2bca857feb3e'
+key = <'auth key'>
 def get_officers_api(companyNumber):
   api=f"https://api.company-information.service.gov.uk/company/{companyNumber}/officers"
   response = requests.get(api
@@ -161,7 +153,9 @@ def get_directors(companyNumber, Report_Id):
 # COMMAND ----------
 
 # MAGIC %md 
-# MAGIC Now we just need to extract the company numbers and get our data! We will make 500 requests, and then wait until enough time has passed to make another batch of requests, erring on the side of caution by waiting a bit longer than necessary. This creates a 
+# MAGIC Now we just need to extract the company numbers and get our data! We will make 500 requests, and then wait until enough time has passed to make another batch of requests, erring on the side of caution by waiting a bit longer than necessary. This creates a database table containing the information. 
+# MAGIC 
+# MAGIC NB - this takes between 7-9 hours to complete.
 
 # COMMAND ----------
 
@@ -202,3 +196,40 @@ while i< (n_records + increment):
   
 
 
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC 
+# MAGIC For the purposes of the workshop, we're going to focus on just the personal information
+
+# COMMAND ----------
+
+username = spark.sql('select current_user() as user').collect()[0]['user']
+database = f"{username.replace('.', '_').replace('@', '_')}_splink_data"
+
+from pyspark.sql import functions as F
+cleansed_company_officers = (
+  spark.read.table(f"{database}.company_officers")
+  .withColumn("forenames", F.split("name", ",")[1])
+  .withColumn("surname", F.split("name", ",")[0])
+  .select(
+    "name"
+    ,"country_of_residence"
+    ,"nationality"
+    ,"date_of_birth"
+    ,"forenames"
+    ,"surname"
+    ,"postal_code"
+    ,"premises"
+    ,"address_line_1"
+    ,"locality"
+    ,"region"
+  )
+.drop_duplicates()
+  .withColumn("uid", F.monotonically_increasing_id())
+)
+
+cleansed_company_officers.write.mode("append").saveAsTable(f"{database}.cleansed_company_officers")
+
+display(cleansed_company_officers)

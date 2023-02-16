@@ -40,31 +40,21 @@ import mlflow
 # COMMAND ----------
 
 username = spark.sql('select current_user() as user').collect()[0]['user']
-db_name = username.replace(".", "_").replace("@", "_").replace("-","_")
+db_name = f"{username.replace('.', '_').replace('@', '_')}_splink_data"
 db_name
 
 # COMMAND ----------
 
-spark.sql(f"CREATE DATABASE IF NOT EXISTS {db_name}")
-spark.sql(f"USE {db_name}")
+table_name = "cleansed_company_officers"
+data = spark.read.table(db_name+'.'+table_name)
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## Getting the data (again)
-# MAGIC 
-# MAGIC And retrieve the data we should already be familiar with.
-
-# COMMAND ----------
-
-# MAGIC %run
-# MAGIC ../setup/data-setup
-
-# COMMAND ----------
-
-table_name = "companies_with_officers"
-table_path = f"/mnt/source/splinkdata/delta/{table_name}"
-data = spark.read.load(table_path)
+# DBTITLE 1,Remove cached Splink tables
+#Splink has an issue where changes to the input data are not reflected in it's cached tables. Run this step after doing any feature engineering.
+x = spark.sql(f"show tables from {db_name} like '*__splink__*'").collect()
+for _ in x:
+    spark.sql(f"drop table {db_name}.{_.tableName}")
 
 # COMMAND ----------
 
@@ -174,10 +164,6 @@ linker.profile_columns("postcode_validated", top_n=30, bottom_n=10)
 # COMMAND ----------
 
 linker.missingness_chart()
-
-# COMMAND ----------
-
-linker.completeness_chart()
 
 # COMMAND ----------
 
