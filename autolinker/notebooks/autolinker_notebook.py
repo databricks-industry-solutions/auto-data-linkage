@@ -66,10 +66,8 @@ class AutoLinker:
     """
     
     # calculate normalised value count per unique value in colunn
-    rowcount = data.count()
-    vc = data.groupBy(column).count().withColumn("norm_count", F.col("count")/rowcount)
-    
-#     _udf_entropy = F.udf(lambda x: self._calculate_p(x), DoubleType())
+    vc = data.groupBy(column).count().withColumn("norm_count", F.col("count")/self.data_rowcount)
+
     
     # Calculate P*ln(P) per row
     vc = vc.withColumn("entropy", F.col("norm_count")*F.log(F.col("norm_count")))
@@ -548,6 +546,9 @@ class AutoLinker:
       - None
     """
     
+    # Count rows in data - doing this here so we only do it once
+    self.data_rowcount = data.count()
+    
     #set start time for measuring duration
     start = datetime.now()
     
@@ -654,6 +655,7 @@ class AutoLinker:
     """
     
     print(success_text)
+    
     
     
 
