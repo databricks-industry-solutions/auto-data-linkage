@@ -61,14 +61,6 @@ else:
 
 # COMMAND ----------
 
-# DBTITLE 1,Remove cached Splink tables
-#Splink has an issue where changes to the input data are not reflected in it's cached tables. Run this step after doing any feature engineering.
-x = spark.sql(f"show tables from {db_name} like '*__splink__*'").collect()
-for _ in x:
-    spark.sql(f"drop table {db_name}.{_.tableName}")
-
-# COMMAND ----------
-
 # MAGIC %md
 # MAGIC ## Our Turn
 # MAGIC 
