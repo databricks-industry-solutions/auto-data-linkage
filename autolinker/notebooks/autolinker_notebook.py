@@ -3,6 +3,12 @@
 
 # COMMAND ----------
 
+# disable AQE
+# Repartition data to 400 & cache
+spark.conf.set("spark.databricks.optimizer.adaptive.enabled", "false")
+
+# COMMAND ----------
+
 from pyspark.sql import functions as F
 from pyspark.sql.types import *
 
@@ -14,12 +20,17 @@ import hyperopt
 from hyperopt import fmin, tpe, hp, SparkTrials, STATUS_OK, Trials
 from hyperopt.pyll import scope
 
+from sklearn.mixture import GaussianMixture
+
+from pyspark.ml.evaluation import BinaryClassificationEvaluator
+
 import pandas as pd
 import numpy as np
 import itertools
 import math
 import random
 from datetime import datetime
+from pprint import pprint
 
 import mlflow
 
@@ -96,7 +107,7 @@ class AutoLinker:
     return rules
   
   
-  def _generate_candidate_blocking_rules(self, data, attribute_columns, comparison_size_limit, max_columns_per_rule=2):
+  def _generate_candidate_blocking_rules(self, data, attribute_columns, comparison_size_limit, unique_id, max_columns_per_rule=2):
     """
     Method to automatically generate a list of lists of blocking rules to test, given a user-defined limit for
     pair-wise comparison size.
@@ -128,7 +139,7 @@ class AutoLinker:
       "retain_intermediate_calculation_columns": True,
       "retain_matching_columns": True,
       "link_type": "dedupe_only",
-      "unique_id_column_name": "uid",
+      "unique_id_column_name": unique_id,
       "em_convergence": 0.01,
       "blocking_rules_to_generate_predictions": blocking_rules_to_generate_predictions
     }
@@ -153,7 +164,7 @@ class AutoLinker:
     return accepted_rules
 
   
-  def _create_hyperopt_space(self, data, attribute_columns, comparison_size_limit, max_columns_per_rule=2):
+  def _create_hyperopt_space(self, data, attribute_columns, comparison_size_limit, unique_id, max_columns_per_rule=2):
     """
     Method to create hyperopt space for comparison and blocking rule hyperparameters from list of columns.
     Takes a given (or generated) list of columns and produces a dictionary that can be converted to a comparison list later on,
@@ -172,6 +183,7 @@ class AutoLinker:
       data=data,
       attribute_columns=attribute_columns,
       comparison_size_limit=comparison_size_limit,
+      unique_id=unique_id,
       max_columns_per_rule=max_columns_per_rule
     )
 
@@ -270,7 +282,7 @@ class AutoLinker:
     # Left anti-join predictions on original data to get all records outside of blocking rules
     data_without_predictions = data.join(
       df_predictions,
-      data.uid==df_predictions.uid,
+      data[unique_id]==df_predictions[unique_id],
       how="left_anti"
     )
 
@@ -312,7 +324,7 @@ class AutoLinker:
   
   
   
-  def calculate_empirical_score(self, data, predictions, threshold):
+  def calculate_empirical_score(self, data, predictions, unique_id, threshold):
     """
     Method to calculate precision, recall and F1 score based on ground truth labels.
     Assumes the data has a column with empirical IDs to assess whether two records belong
@@ -332,10 +344,10 @@ class AutoLinker:
       data_recid_groupby = data.groupBy("recid").count().filter("count>1").withColumnRenamed("recid", "recid_")
       data_tp = data.join(data_recid_groupby, data.recid==data_recid_groupby.recid_, how="inner").drop("recid_")
 
-      data_l = data_tp.withColumnRenamed("uid", "uid_l").withColumnRenamed("recid", "recid_l").select("uid_l", "recid_l")
-      data_r = data_tp.withColumnRenamed("uid", "uid_r").withColumnRenamed("recid", "recid_r").select("uid_r", "recid_r")
+      data_l = data_tp.withColumnRenamed(unique_id, f"{unique_id}_l").withColumnRenamed("recid", "recid_l").select(f"{unique_id}_l", "recid_l")
+      data_r = data_tp.withColumnRenamed(unique_id, f"{unique_id}_r").withColumnRenamed("recid", "recid_r").select(f"{unique_id}_r", "recid_r")
 
-      dt = data_l.join(data_r, data_l.uid_l!=data_r.uid_r, how="inner")
+      dt = data_l.join(data_r, data_l[f"{unique_id}_l"]!=data_r[f"{unique_id}_r"], how="inner")
       # create boolean col for y_true
       df_true = dt.withColumn("match", F.when(F.col("recid_l")==F.col("recid_r"), 1).otherwise(0))
       # only keep matches
@@ -351,21 +363,21 @@ class AutoLinker:
     # TP is the inner join of true and predicted pairs
     tp = df_pred.join(
       self.df_true_positives,
-      ((df_pred.uid_l==self.df_true_positives.uid_l) & (df_pred.uid_r==self.df_true_positives.uid_r)) | ((df_pred.uid_l==self.df_true_positives.uid_r) & (df_pred.uid_r==self.df_true_positives.uid_l)),
+      ((df_pred[f"{unique_id}_l"]==self.df_true_positives[f"{unique_id}_r"]) & (df_pred[f"{unique_id}_l"]==self.df_true_positives[f"{unique_id}_r"])) | ((df_pred[f"{unique_id}_l"]==self.df_true_positives[f"{unique_id}_r"]) & (df_pred[f"{unique_id}_r"]==self.df_true_positives[f"{unique_id}_l"])),
       how="inner"
     ).count()
     
     # FN is the left anti-join of true and predicted
     fn = self.df_true_positives.join(
       df_pred,
-      ((df_pred.uid_l==self.df_true_positives.uid_l) & (df_pred.uid_r==self.df_true_positives.uid_r)) | ((df_pred.uid_l==self.df_true_positives.uid_r) & (df_pred.uid_r==self.df_true_positives.uid_l)),
+      ((df_pred[f"{unique_id}_l"]==self.df_true_positives[f"{unique_id}_l"]) & (df_pred[f"{unique_id}_r"]==self.df_true_positives[f"{unique_id}_r"])) | ((df_pred[f"{unique_id}_l"]==self.df_true_positives[f"{unique_id}_r"]) & (df_pred[f"{unique_id}_r"]==self.df_true_positives[f"{unique_id}_l"])),
       how="left_anti"
     ).count()
     
     # FP is the left anti-join of predicted and true
     fp = df_pred.join(
       self.df_true_positives,
-      ((df_pred.uid_l==self.df_true_positives.uid_l) & (df_pred.uid_r==self.df_true_positives.uid_r)) | ((df_pred.uid_l==self.df_true_positives.uid_r) & (df_pred.uid_r==self.df_true_positives.uid_l)),
+      ((df_pred[f"{unique_id}_l"]==self.df_true_positives[f"{unique_id}_l"]) & (df_pred[f"{unique_id}_r"]==self.df_true_positives[f"{unique_id}_r"])) | ((df_pred[f"{unique_id}_l"]==self.df_true_positives[f"{unique_id}_r"]) & (df_pred[f"{unique_id}_r"]==self.df_true_positives[f"{unique_id}_l"])),
       how="left_anti"
     ).count()
     
@@ -471,7 +483,7 @@ class AutoLinker:
     """
 
     # Calculate empirical scores
-    precision, recall, f1 = self.calculate_empirical_score(data, predictions, threshold)
+    precision, recall, f1 = self.calculate_empirical_score(data, predictions, unique_id, threshold)
     
     # Deduplicate data
     deduped = self.deduplicate_records(data, predictions, linker, attribute_columns, unique_id, threshold)
@@ -522,45 +534,6 @@ class AutoLinker:
     
     return linker, predictions, evals
   
-
-
-  def log_to_mlflow(self, trials):
-    """
-    Method to log parameters and loss function of each trial as an MLflow run.
-    Parameters
-    : trials : hyperopt.Trials object created after a hyperopt run
-    Returns:
-      - None
-    """
-    
-    for t in trials.trials:
-      with mlflow.start_run():
-        params = t['misc']['vals']
-        blocking_rules = t['misc']['vals']['blocking_rules'][0]
-        comparison_params = {}
-
-        for k, v in params.items():
-          if ("threshold" in k) & (len(v)>0):
-            column, function, _ = k.split('|')
-            comparison_params.update({
-              column: {
-                "function": function,
-                "threshold": v[0]
-              }
-            })
-
-        params = {
-          "blocking_rules": self.blocking_rules[blocking_rules],
-          "comparisons": comparison_params,
-          "deterministic_rules": self._generate_rules(self.deterministic_columns),
-          "training_rules": self._generate_rules(self.training_columns),
-        }
-        metrics = {k:v for k, v in t["result"].items() if not k=="status"}
-        mlflow.log_dict(params, "params.json")
-        mlflow.log_params(params)
-        mlflow.log_metrics(metrics)
-
-    return None
   
   
   def auto_link(self, data, attribute_columns, unique_id, comparison_size_limit, max_evals, deterministic_columns=None, training_columns=None, threshold=0.9):
@@ -589,7 +562,7 @@ class AutoLinker:
         data,
         space,
         attribute_columns,
-        unique_id="uid",
+        unique_id=unique_id,
         deterministic_columns=self.deterministic_columns,
         training_columns=self.training_columns,
         threshold=threshold
@@ -605,7 +578,7 @@ class AutoLinker:
     
     # initialise trials and create hyperopt space
     self.trials = Trials()
-    space = self._create_hyperopt_space(data, attribute_columns, comparison_size_limit)
+    space = self._create_hyperopt_space(data, attribute_columns, comparison_size_limit, unique_id)
 
     # run hyperopt trials
     self.best = fmin(
@@ -615,10 +588,6 @@ class AutoLinker:
       max_evals=max_evals,
       trials=self.trials
     )
-    
-    # log trials to MLflow
-
-#     self.log_to_mlflow(self.trials)
     
     # Set best params, metrics and results
     t = self.trials.best_trial
@@ -743,7 +712,7 @@ predictions.as_spark_dataframe().display()
 # COMMAND ----------
 
 # DBTITLE 1,Sample dataset to reduce to 100k rows
-data = spark.read.table("marcell_autosplink.music_data").sample(0.5)
+data = spark.read.table("marcell_autosplink.music_data")
 
 # COMMAND ----------
 
@@ -755,10 +724,14 @@ data = data \
 
 # COMMAND ----------
 
+data = data.repartition(400).cache()
+
+# COMMAND ----------
+
 autolinker = AutoLinker(
   #spark=spark,                                                                                               # spark instance
   schema="marcell_autosplink",                                                                               # schema to write results to
-  experiment_name="/Users/marcell.ferencz@databricks.com/autosplink/evaluate/autosplink_music_experiment_full"  # MLflow experiment location
+  experiment_name="/Users/marcell.ferencz@databricks.com/autosplink/evaluate/autosplink_music_experiment_full_3"  # MLflow experiment location
 )
 
 # COMMAND ----------
@@ -767,6 +740,38 @@ autolinker.auto_link(
   data=data,                                                         # dataset to dedupe
   attribute_columns=["title", "length", "artist", "album", "year", "language"],  # columns that contain attributes to compare
   unique_id="uid",                                                   # column name of the unique ID
-  comparison_size_limit=200000,                                      # Maximum number of pairs when blocking applied
-  max_evals=200                                                      # Maximum number of hyperopt trials to run
+  comparison_size_limit=100000,                                      # Maximum number of pairs when blocking applied
+  max_evals=100                                                      # Maximum number of hyperopt trials to run
 )
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC # Beer data
+# MAGIC https://github.com/ZJU-DAILY/CollaborEM/tree/main/data/ER-Magellan/Structured/BeerAdvo-RateBeer
+
+# COMMAND ----------
+
+data = spark.read.table(f"marcell_autosplink.beer_data")
+
+# COMMAND ----------
+
+autolinker = AutoLinker(
+  #spark=spark,                                                                                               # spark instance
+  schema="marcell_autosplink",                                                                               # schema to write results to
+  experiment_name="/Users/marcell.ferencz@databricks.com/autosplink/evaluate/autosplink_beer_experiment"  # MLflow experiment location
+)
+
+# COMMAND ----------
+
+autolinker.auto_link(
+  data=data,                                                         # dataset to dedupe
+  attribute_columns=["Beer_Name", "Brew_Factory_Name", "Style", "ABV"],  # columns that contain attributes to compare
+  unique_id="id",                                                   # column name of the unique ID
+  comparison_size_limit=100000,                                      # Maximum number of pairs when blocking applied
+  max_evals=100                                                      # Maximum number of hyperopt trials to run
+)
+
+# COMMAND ----------
+
+
