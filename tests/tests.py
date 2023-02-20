@@ -32,7 +32,7 @@ job_json = {
                 "notebook_task": {
                     "notebook_path": f"Workshop Materials/notebooks/Splink in Databricks - end-to-end example.py",
                 },
-                "task_key": "workshop - expert answer",
+                "task_key": "workshop - end to end example",
                 "description": ""
             },
           {
@@ -41,7 +41,7 @@ job_json = {
                 "notebook_task": {
                     "notebook_path": f"Workshop Materials/notebooks/Splink in Databricks - Exercise.py",
                 },
-                "task_key": "workshop - expert answer",
+                "task_key": "workshop - exercise",
                 "description": ""
             },
             
