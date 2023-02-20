@@ -47,6 +47,7 @@
 # DBTITLE 1,Get current username
 username = spark.sql('select current_user() as user').collect()[0]['user']
 db_name = f"{username.replace('.', '_').replace('@', '_')}_splink_data"
+spark.sql(f"CREATE DATABASE IF NOT EXISTS {db_name}")
 db_name
 
 # COMMAND ----------
