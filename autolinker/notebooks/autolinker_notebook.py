@@ -379,8 +379,15 @@ class AutoLinker:
     tn = (N*(N-1))-tp-fn-fp
     
     # Calculate precision, recall and f1
-    precision = tp/(tp+fp)
-    recall = tp/(tp+fn)
+    if tp+fp>0.0:
+      precision = tp/(tp+fp)
+    else:
+      precision: 0.9
+      
+    if tp+fn>0.0:
+      recall = tp/(tp+fn)
+    else:
+      recall = 0.0
 
     if (precision+recall)>0:
       f1 = precision*recall/(precision+recall)
