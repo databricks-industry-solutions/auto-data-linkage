@@ -44,6 +44,10 @@
 
 # COMMAND ----------
 
+pip install splink==3.7.0.dev1
+
+# COMMAND ----------
+
 # DBTITLE 1,Get current username
 username = spark.sql('select current_user() as user').collect()[0]['user']
 db_name = f"{username.replace('.', '_').replace('@', '_')}_splink_data"

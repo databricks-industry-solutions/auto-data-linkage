@@ -9,6 +9,10 @@
 
 # COMMAND ----------
 
+pip install splink==3.7.0.dev1
+
+# COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## Load Libraries
 # MAGIC 
