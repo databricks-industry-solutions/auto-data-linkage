@@ -40,7 +40,7 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install splink --quiet
+# MAGIC %pip install splink --quiet‘
 
 # COMMAND ----------
 
