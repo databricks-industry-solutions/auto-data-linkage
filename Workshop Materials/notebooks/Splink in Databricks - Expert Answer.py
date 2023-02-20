@@ -45,8 +45,19 @@ db_name
 
 # COMMAND ----------
 
-table_name = "cleansed_company_officers"
-data = spark.read.table(db_name+'.'+table_name)
+# DBTITLE 1,Parameterise notebook to allow for automated testing
+dbutils.widgets.dropdown("testing", "False", ["True", "False"])
+is_test = dbutils.widgets.get("testing") == "True"
+
+# COMMAND ----------
+
+if is_test:
+    data = spark.createDataFrame(
+        pd.read_json("../setup/mock_data.json")
+  )
+else:
+    table_name = "cleansed_company_officers"
+    data = spark.read.table(db_name+'.'+table_name)
 
 # COMMAND ----------
 

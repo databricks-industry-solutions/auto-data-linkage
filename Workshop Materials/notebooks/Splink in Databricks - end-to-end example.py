@@ -67,6 +67,7 @@ import splink.spark.spark_comparison_library as cl
 from utils.mlflow import splink_mlflow
 
 import mlflow
+import pandas as pd
 
 # COMMAND ----------
 
@@ -92,6 +93,12 @@ import mlflow
 
 # COMMAND ----------
 
+# DBTITLE 1,Parameterise notebook to allow for automated testing
+dbutils.widgets.dropdown("testing", "False", ["True", "False"])
+is_test = dbutils.widgets.get("testing") == "True"
+
+# COMMAND ----------
+
 # MAGIC %md
 # MAGIC ### Loading and inspecting the data
 # MAGIC 
@@ -107,8 +114,13 @@ for _ in x:
 
 # COMMAND ----------
 
-table_name = "cleansed_company_officers"
-data = spark.read.table(db_name+'.'+table_name)
+if is_test:
+  data = spark.createDataFrame(
+    pd.read_json("../setup/mock_data.json")
+  )
+else:
+  table_name = "cleansed_company_officers"
+  data = spark.read.table(db_name+'.'+table_name)
 
 # COMMAND ----------
 
