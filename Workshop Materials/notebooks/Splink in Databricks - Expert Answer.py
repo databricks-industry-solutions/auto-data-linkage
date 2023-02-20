@@ -27,7 +27,6 @@ import pandas as pd
 from IPython.display import IFrame
 
 from utils.splink_linker_model import SplinkLinkerModel
-from utils.mlflow_utils import *
 from utils.mlflow import splink_mlflow
 
 import mlflow

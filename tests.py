@@ -22,10 +22,10 @@ job_json = {
                 "libraries": [],
                 "notebook_task": {
                     "notebook_path": f"/Workshop Materials/notebooks/Splink in Databricks - Expert Answer",
+                  "base_parameters": {
+                    "testing": "True"
+                    }
                 },
-              "base_parameters": {
-                        "testing": "True"
-                    },
                 "task_key": "workshop-expert_answer",
                 "description": ""
             },
@@ -33,11 +33,11 @@ job_json = {
                 "job_cluster_key": "hackathon_cluster",
                 "libraries": [],
                 "notebook_task": {
-                    "notebook_path": f"/Workshop Materials/notebooks/Splink in Databricks - end-to-end example",
+                  "notebook_path": f"/Workshop Materials/notebooks/Splink in Databricks - end-to-end example",
+                  "base_parameters": {
+                    "testing": "True"
+                    }
                 },
-              "base_parameters": {
-                        "testing": "True"
-                    },
                 "task_key": "workshop-end_to-end_example",
                 "description": ""
             },
@@ -46,10 +46,10 @@ job_json = {
                 "libraries": [],
                 "notebook_task": {
                     "notebook_path": f"/Workshop Materials/notebooks/Splink in Databricks - Exercise",
+                  "base_parameters": {
+                    "testing": "True"
+                    }
                 },
-              "base_parameters": {
-                        "testing": "True"
-                    },
                 "task_key": "workshop-exercise",
                 "description": ""
             },
