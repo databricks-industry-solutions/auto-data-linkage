@@ -42,14 +42,13 @@ class AutoLinker:
   """
   
   def __init__(self, schema, experiment_name):
-#     self.spark = spark
+
     self.schema = schema
     self.experiment_name = experiment_name
     self.training_columns = None
     self.deterministic_columns = None
     self.df_true_positives = None
     
-    spark.sql(f"USE {schema}")
     mlflow.set_experiment(experiment_name)
 
   
@@ -134,7 +133,7 @@ class AutoLinker:
     blocking_rules_to_generate_predictions = self._generate_rules(blocking_combinations)
 
     # create dummy linker to count number of combinations
-    linker = SparkLinker(data, spark=spark)
+    linker = SparkLinker(data, spark=spark, database=self.schema)
     settings = {
       "retain_intermediate_calculation_columns": True,
       "retain_matching_columns": True,
@@ -157,7 +156,7 @@ class AutoLinker:
           accepted_rules.append(list(c))
 
     # clean up intermediate tables (not sure if needed)
-    x = spark.sql("show tables like '*__splink__*'").collect()
+    x = spark.sql(f"show tables like '{self.schema}.*__splink__*'").collect()
     for _ in x:
         spark.sql(f"drop table {_.tableName}") 
 
@@ -271,27 +270,23 @@ class AutoLinker:
     
     # Cluster records that are matched above threshold
     clusters = linker.cluster_pairwise_predictions_at_threshold(predictions, threshold_match_probability=threshold)
-    df_predictions = clusters.as_spark_dataframe()
+    df_predictions = clusters.as_spark_dataframe().select(unique_id, "cluster_id")
 
+    # Get max cluster id to use as lower bound of monotonically increasing id
+    max_cluster_id = df_predictions.select(F.max("cluster_id")).collect()[0]["max(cluster_id)"] + 1
     
-    # Deduplicate predictions by grouping on cluster_id
-    df_deduped_preds = df_predictions.groupBy("cluster_id").agg(
+    # Assign monotonically increasing id greater than max cluster_id
+    data = data.withColumn("tmp_cluster_id", F.monotonically_increasing_id()+max_cluster_id)
+    
+    # Left join predictions onto input data
+    data = data.join(df_predictions, on=unique_id, how="left")
+    
+    # Coalesce
+    data = data.withColumn("cluster_id", F.coalesce(F.col("cluster_id"), F.col("tmp_cluster_id")))
+    
+    # Group by cluster ID
+    df_deduped = data.groupBy("cluster_id").agg(
       *(F.first(i).alias(i) for i in attribute_columns)
-    )
-
-    # Left anti-join predictions on original data to get all records outside of blocking rules
-    data_without_predictions = data.join(
-      df_predictions,
-      data[unique_id]==df_predictions[unique_id],
-      how="left_anti"
-    )
-
-    # Union deduped predictions and data outside of blocking rules
-    df_deduped = df_deduped_preds \
-      .select(attribute_columns) \
-      .union(
-        data_without_predictions \
-          .select(attribute_columns)
     )
 
     return df_deduped
@@ -456,7 +451,7 @@ class AutoLinker:
     }
 
     # Train linker model
-    linker = SparkLinker(data, spark=spark)
+    linker = SparkLinker(data, spark=spark, database=self.schema)
     linker.initialise_settings(settings)
     linker.estimate_probability_two_random_records_match(deterministic_rules, recall=0.8)
     linker.estimate_u_using_random_sampling(target_rows=1e7)
@@ -659,6 +654,7 @@ class AutoLinker:
     """
     
     print(success_text)
+    
     
 
 # COMMAND ----------
