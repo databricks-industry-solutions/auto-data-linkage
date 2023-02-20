@@ -14,17 +14,12 @@ import hyperopt
 from hyperopt import fmin, tpe, hp, SparkTrials, STATUS_OK, Trials
 from hyperopt.pyll import scope
 
-from sklearn.mixture import GaussianMixture
-
-from pyspark.ml.evaluation import BinaryClassificationEvaluator
-
 import pandas as pd
 import numpy as np
 import itertools
 import math
 import random
 from datetime import datetime
-from pprint import pprint
 
 import mlflow
 
