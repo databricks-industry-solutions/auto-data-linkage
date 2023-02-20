@@ -25,8 +25,6 @@ import pandas as pd
 
 from IPython.display import IFrame
 
-from utils.splink_linker_model import SplinkLinkerModel
-from utils.mlflow_utils import *
 from utils.mlflow import splink_mlflow
 
 import mlflow
@@ -46,14 +44,6 @@ db_name
 
 table_name = "cleansed_company_officers"
 data = spark.read.table(db_name+'.'+table_name)
-
-# COMMAND ----------
-
-# DBTITLE 1,Remove cached Splink tables
-#Splink has an issue where changes to the input data are not reflected in it's cached tables. Run this step after doing any feature engineering.
-x = spark.sql(f"show tables from {db_name} like '*__splink__*'").collect()
-for _ in x:
-  spark.sql(f"drop table {db_name}.{_.tableName}")
 
 # COMMAND ----------
 
@@ -203,17 +193,6 @@ with open("/dbfs"+path, "r") as f:
     html=f.read()
     
 displayHTML(html)
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC To visualise clusters together, you can use the `visualise_linked_records` for a static (but less readable) picture of the connected records.
-# MAGIC 
-# MAGIC Use the `linkage_threshold` argument to set the minimum match probability, and the `min_linked_records` argument to set a minimum number of records in a cluster for it to be visualised. Avoid setting these too low or the visualisation will be unreadable.
-
-# COMMAND ----------
-
-visualise_linked_records(predictions.as_pandas_dataframe(), min_linked_records=10, linkage_threshold=0.9)
 
 # COMMAND ----------
 
