@@ -266,12 +266,10 @@ class AutoLinker:
     clusters = linker.cluster_pairwise_predictions_at_threshold(predictions, threshold_match_probability=threshold)
     df_predictions = clusters.as_spark_dataframe()
 
-    ids_to_agg = attribute_columns
-    ids_to_agg.append(unique_id)
     
     # Deduplicate predictions by grouping on cluster_id
     df_deduped_preds = df_predictions.groupBy("cluster_id").agg(
-      *(F.first(i).alias(i) for i in ids_to_agg)
+      *(F.first(i).alias(i) for i in attribute_columns)
     )
 
     # Left anti-join predictions on original data to get all records outside of blocking rules
@@ -283,10 +281,10 @@ class AutoLinker:
 
     # Union deduped predictions and data outside of blocking rules
     df_deduped = df_deduped_preds \
-      .select(ids_to_agg) \
+      .select(attribute_columns) \
       .union(
         data_without_predictions \
-          .select(ids_to_agg)
+          .select(attribute_columns)
     )
 
     return df_deduped
@@ -510,7 +508,16 @@ class AutoLinker:
     # Evaluate model
     evals = self.evaluate_linker(data, predictions, threshold, attribute_columns, unique_id, linker)
 
-
+    # Log to MLflow
+    with mlflow.start_run():
+      mlflow.log_metrics(evals)
+      params = space.copy()
+      params["deterministic_columns"] = self.deterministic_columns
+      params["training_columns"] = self.training_columns
+      mlflow.log_dict(params, "model_parameters.json")
+      
+    
+    
     return linker, predictions, evals
   
 
@@ -609,7 +616,7 @@ class AutoLinker:
     
     # log trials to MLflow
 
-    self.log_to_mlflow(self.trials)
+#     self.log_to_mlflow(self.trials)
     
     # Set best params, metrics and results
     t = self.trials.best_trial
@@ -698,7 +705,7 @@ data = spark.read.table("marcell_autosplink.voters_data_sample")
 autolinker = AutoLinker(
   #spark=spark,                                                                                               # spark instance
   schema="marcell_autosplink",                                                                               # schema to write results to
-  experiment_name="/Users/marcell.ferencz@databricks.com/autosplink/evaluate/autosplink_experiment_large"  # MLflow experiment location
+  experiment_name="/Users/marcell.ferencz@databricks.com/autosplink/evaluate/autosplink_voters_test"  # MLflow experiment location
 )
 
 # COMMAND ----------
@@ -707,8 +714,8 @@ autolinker.auto_link(
   data=data,                                                         # dataset to dedupe
   attribute_columns=["givenname", "surname", "suburb", "postcode"],  # columns that contain attributes to compare
   unique_id="uid",                                                   # column name of the unique ID
-  comparison_size_limit=200000,                                      # Maximum number of pairs when blocking applied
-  max_evals=60                                                      # Maximum number of hyperopt trials to run
+  comparison_size_limit=100000,                                      # Maximum number of pairs when blocking applied
+  max_evals=3                                                      # Maximum number of hyperopt trials to run
 )
 
 # COMMAND ----------
@@ -733,10 +740,12 @@ predictions.as_spark_dataframe().display()
 
 # COMMAND ----------
 
+# DBTITLE 1,Sample dataset to reduce to 100k rows
 data = spark.read.table("marcell_autosplink.music_data").sample(0.5)
 
 # COMMAND ----------
 
+# DBTITLE 1,Truncate strings to 20 chars max
 data = data \
   .withColumn("title", F.substring(F.col("title"), 0, 20)) \
   .withColumn("artist", F.substring(F.col("artist"), 0, 20)) \
@@ -747,7 +756,7 @@ data = data \
 autolinker = AutoLinker(
   #spark=spark,                                                                                               # spark instance
   schema="marcell_autosplink",                                                                               # schema to write results to
-  experiment_name="/Users/marcell.ferencz@databricks.com/autosplink/evaluate/autosplink_music_experiment"  # MLflow experiment location
+  experiment_name="/Users/marcell.ferencz@databricks.com/autosplink/evaluate/autosplink_music_experiment_full"  # MLflow experiment location
 )
 
 # COMMAND ----------
@@ -757,5 +766,5 @@ autolinker.auto_link(
   attribute_columns=["title", "length", "artist", "album", "year", "language"],  # columns that contain attributes to compare
   unique_id="uid",                                                   # column name of the unique ID
   comparison_size_limit=200000,                                      # Maximum number of pairs when blocking applied
-  max_evals=100                                                      # Maximum number of hyperopt trials to run
+  max_evals=200                                                      # Maximum number of hyperopt trials to run
 )
