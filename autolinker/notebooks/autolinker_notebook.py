@@ -41,12 +41,13 @@ class AutoLinker:
   Class to create object autolinker for automated data linking
   """
   
-  def __init__(self, schema, experiment_name):
+  def __init__(self, catalog, schema, experiment_name, training_columns=None, deterministic_columns=None):
 
+    self.catalog = catalog
     self.schema = schema
     self.experiment_name = experiment_name
-    self.training_columns = None
-    self.deterministic_columns = None
+    self.training_columns = training_columns
+    self.deterministic_columns = deterministic_columns
     self.df_true_positives = None
     
     mlflow.set_experiment(experiment_name)
@@ -123,41 +124,29 @@ class AutoLinker:
     # create list of all possible rules
     for n in range(1, max_columns_per_rule+1):
       combs = list(itertools.combinations(attribute_columns, n))
+      blocking_combinations.extend(combs)
 
-      rules = ["&".join(comb) for comb in combs]
-      blocking_combinations.extend(rules)
+    # Convert them to Splink-compatible rules
+    blocking_rules = self._generate_rules(["&".join(r) for r in blocking_combinations])
+    
+    # Estimate number of pairs per blocking rule by grouping on blocking rule columns and getting the sum of squares of counts
+    comp_size_dict = dict()
 
-    # generate Splink-compatible blocking rules
-    blocking_rules_to_generate_predictions = self._generate_rules(blocking_combinations)
-
-    # create dummy linker to count number of combinations
-    linker = SparkLinker(data, spark=spark, database=self.schema)
-    settings = {
-      "retain_intermediate_calculation_columns": True,
-      "retain_matching_columns": True,
-      "link_type": "dedupe_only",
-      "unique_id_column_name": unique_id,
-      "em_convergence": 0.01,
-      "blocking_rules_to_generate_predictions": blocking_rules_to_generate_predictions
-    }
-    linker.initialise_settings(settings)
-
-    # create dictionary of all possible combinations and their sizes
-    comp_size = [linker.count_num_comparisons_from_blocking_rule(i) for i in blocking_rules_to_generate_predictions]
-    comp_size_dict = {r: s for r, s in zip(blocking_rules_to_generate_predictions, comp_size)}
-
+    for comb, rule in zip(blocking_combinations, blocking_rules):
+      num_pairs = data.groupBy(list(comb)).count().select(F.sum(F.col("count")*F.col("count"))).collect()[0]["sum((count * count))"]
+      comp_size_dict.update({rule: num_pairs})
+    
     # loop through all combinations of combinations and save those which remain under the limit (this is a bit brute force)
     accepted_rules = []
-    for r in range(1, len(blocking_rules_to_generate_predictions)+1):
-      for c in itertools.combinations(blocking_rules_to_generate_predictions, r):
+    for r in range(1, len(blocking_rules)+1):
+      for c in itertools.combinations(blocking_rules, r):
         if sum([v for k, v in comp_size_dict.items() if k in c])<=comparison_size_limit:
           accepted_rules.append(list(c))
 
-    # clean up intermediate tables (not sure if needed)
-    x = spark.sql(f"show tables like '{self.schema}.*__splink__*'").collect()
-    for _ in x:
-        spark.sql(f"drop table {_.tableName}") 
 
+    if len(accepted_rules)<1:
+      raise ValueError("No blocking rules meet the comparison size limit.")
+          
     return accepted_rules
 
   
@@ -214,10 +203,12 @@ class AutoLinker:
   
   def _drop_intermediate_tables(self):
     # Drop intermediate tables in schema for consecutive runs
-    x = spark.sql("show tables like '*__splink__*'").collect()
-    for _ in x:
-      spark.sql(f"drop table {_.tableName}") 
-        
+    tables_in_schema = spark.sql(f"show tables from {self.catalog}.{self.schema} like '*__splink__*'").collect()
+    for table in tables_in_schema:
+      try:
+        spark.sql(f"drop table marcell_splink.marcell_autosplink.{table.tableName}") 
+      except:
+        spark.sql(f"drop table {table.tableName}") 
   
   def _create_comparison_list(self, space):
     """
@@ -395,6 +386,30 @@ class AutoLinker:
       f1 = 0.0
       
     return precision, recall, f1
+  
+  
+  def _randomise_columns(self, attribute_columns):
+    """
+    Method to randomly select (combinations of) columns from attribute columns for EM training.
+    Will try to pick 2 combinations of 2 (i.e AB and BC from ABC), but will default to 2 if there are only 2.
+    Parameters
+    : attribute_columns : list of strings containing all attribute columns
+    Returns
+      - List of lists of strings
+    """
+    # if there are only 2 columns, return them both
+    if len(attribute_columns)<3:
+      return attribute_columns
+    
+    # pick 3 random columns
+    cols = random.sample(attribute_columns, 3)
+    
+    # this creates a list like ["A&B", "B&C", "A&C"] - it's useful to have an AND statement in the training
+    # columns, otherwise EM training tables balloon
+    training_columns = ["&".join([cols[0], cols[1]]), "&".join([cols[1], cols[2]]), "&".join([cols[0], cols[2]])]
+    
+    return training_columns
+  
 
   def train_linker(self, data, space, attribute_columns, unique_id, deterministic_columns=None, training_columns=None):
     """
@@ -417,7 +432,7 @@ class AutoLinker:
 
     # Get blocking rules from hyperopt space
     blocking_rules_to_generate_predictions = list(space["blocking_rules"])
-
+    print(blocking_rules_to_generate_predictions)
     # Create comparison list from hyperopt space
     comparisons = self._create_comparison_list(space)
 
@@ -432,7 +447,7 @@ class AutoLinker:
     # if deterministic columns are not set, pick 2 at random from attribute columns
     # and save them as an attribute so that they can remain consistent between runs
     if not training_columns:
-      training_columns = random.sample(attribute_columns, 2)
+      training_columns = self._randomise_columns(attribute_columns)
       self.training_columns = training_columns
       
     training_rules = self._generate_rules(training_columns)
@@ -449,7 +464,7 @@ class AutoLinker:
     }
 
     # Train linker model
-    linker = SparkLinker(data, spark=spark, database=self.schema)
+    linker = SparkLinker(data, spark=spark, database=self.schema, catalog=self.catalog)
     linker.initialise_settings(settings)
     linker.estimate_probability_two_random_records_match(deterministic_rules, recall=0.8)
     linker.estimate_u_using_random_sampling(target_rows=1e7)
@@ -476,7 +491,7 @@ class AutoLinker:
     """
 
     # Calculate empirical scores
-    precision, recall, f1 = self.calculate_empirical_score(data, predictions, unique_id, threshold)
+#     precision, recall, f1 = self.calculate_empirical_score(data, predictions, unique_id, threshold)
     
     # Deduplicate data
     deduped = self.deduplicate_records(data, predictions, linker, attribute_columns, unique_id, threshold)
@@ -485,9 +500,9 @@ class AutoLinker:
     mean_entropy_change = self.calculate_entropy_delta(data, deduped, attribute_columns)
     
     evals = {
-      "precision": precision,
-      "recall": recall,
-      "f1": f1,
+#       "precision": precision,
+#       "recall": recall,
+#       "f1": f1,
       "mean_entropy_change": mean_entropy_change
     }
 
@@ -655,6 +670,7 @@ class AutoLinker:
     """
     
     print(success_text)
+    
     
     
     
