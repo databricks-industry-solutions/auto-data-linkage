@@ -52,6 +52,8 @@ class AutoLinker:
     
     mlflow.set_experiment(experiment_name)
 
+  def __str__(self):
+    return f"AutoLinker instance working in {self.catalog}.{self.schema} and MLflow experiment {experiment_name}"
   
   
   def _calculate_column_entropy(self, data, column):
@@ -208,7 +210,47 @@ class AutoLinker:
       try:
         spark.sql(f"drop table marcell_splink.marcell_autosplink.{table.tableName}") 
       except:
-        spark.sql(f"drop table {table.tableName}") 
+        spark.sql(f"drop table {table.tableName}")
+        
+        
+  def _clean_columns(self, data, attribute_columns, cleaning):
+    """
+    Method to clean string columns (turn them to lower case and remove non-alphanumeric characters)
+    in order to help with better (and quicker) string-distance calculations. If cleaning is "all"
+    (as is by default), it will automatically clean as much as it can.  If cleaning is "none", it will do nothing.
+    cleaning can also be a dictionary with keys as column names and values as lists of method strings.
+    The currently available cleaning methods are turning to lower case and removing non-alphanumeric characters.
+    Parameters
+    : data : Spark DataFrame containing the data to be cleaned
+    : attribute_columns : list of strings containing all attribute columns
+    : cleaning : string or dicitonary with keys as column names and values as list of valid cleaning method names.
+    Returns
+      - Spark dataframe
+    """
+    
+    # if cleaning is set to "none", don't do anything to the data
+    if cleaning=="none":
+      return data
+    
+    # if it's set to "all", turn it into a dictionary covering all possible cases
+    if cleaning=="all":
+      cleaning = {col: ["lower", "alphanumeric_only"] for col in attribute_columns}
+      
+    for col, methods in cleaning.items():
+      # if column is not a string, skip it
+      if not data.schema[col].dataType.typeName == "string":
+        continue
+        
+      for method in methods:
+        if method=="alphanumeric_only":
+          # replace column and only keep alphanumeric and space characters
+          data = data.withColumn(col, F.regexp_replace(F.col(col), r"[^A-Za-z0-9 ]+", ""))
+        
+        elif method=="lower":
+          data = data.withColumn(col, F.lower(F.col(col)))
+          
+    return data
+  
   
   def _create_comparison_list(self, space):
     """
@@ -544,7 +586,7 @@ class AutoLinker:
   
   
   
-  def auto_link(self, data, attribute_columns, unique_id, comparison_size_limit, max_evals, deterministic_columns=None, training_columns=None, threshold=0.9):
+  def auto_link(self, data, attribute_columns, unique_id, comparison_size_limit, max_evals, cleaning="all", deterministic_columns=None, training_columns=None, threshold=0.9):
     """
     Method to run a series of hyperopt trials.
     Parameters
@@ -561,11 +603,15 @@ class AutoLinker:
       - None
     """
     
+
+    #set start time for measuring duration
+    start = datetime.now()
+
     # Count rows in data - doing this here so we only do it once
     self.data_rowcount = data.count()
     
-    #set start time for measuring duration
-    start = datetime.now()
+    # Clean the data
+    data = self._clean_columns(data, attribute_columns, cleaning)
     
     # define objective function
     def tune_model(space):
