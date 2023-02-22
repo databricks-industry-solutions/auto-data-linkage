@@ -14,7 +14,6 @@ import itertools
 import math
 import random
 from datetime import datetime
-from pprint import pprint
 
 import mlflow
 
@@ -26,6 +25,7 @@ class AutoLinker:
   Basic usage:
   
   >>> autolinker = AutoLinker(
+  ...   spark=spark                              # Spark instance
   ...   catalog="splink_catalog",                # catalog name
   ...   schema="splink_schema",                  # schema to write results to
   ...   experiment_name="autosplink_experiment"  # MLflow experiment location
@@ -42,8 +42,9 @@ class AutoLinker:
   """
   
   
-  def __init__(self, catalog, schema, experiment_name, training_columns=None, deterministic_columns=None):
+  def __init__(self, spark, catalog, schema, experiment_name, training_columns=None, deterministic_columns=None):
 
+    self.spark = spark
     self.catalog = catalog
     self.schema = schema
     self.experiment_name = experiment_name
@@ -214,12 +215,12 @@ class AutoLinker:
   
   def _drop_intermediate_tables(self):
     # Drop intermediate tables in schema for consecutive runs
-    tables_in_schema = spark.sql(f"show tables from {self.catalog}.{self.schema} like '*__splink__*'").collect()
+    tables_in_schema = self.spark.sql(f"show tables from {self.catalog}.{self.schema} like '*__splink__*'").collect()
     for table in tables_in_schema:
       try:
-        spark.sql(f"drop table marcell_splink.marcell_autosplink.{table.tableName}") 
+        self.spark.sql(f"drop table marcell_splink.marcell_autosplink.{table.tableName}") 
       except:
-        spark.sql(f"drop table {table.tableName}")
+        self.spark.sql(f"drop table {table.tableName}")
         
   
   def _clean_columns(self, data, attribute_columns, cleaning):
@@ -438,7 +439,7 @@ class AutoLinker:
     }
 
     # Train linker model
-    linker = SparkLinker(data, spark=spark, database=self.schema, catalog=self.catalog)
+    linker = SparkLinker(data, spark=self.spark, database=self.schema, catalog=self.catalog)
     linker.initialise_settings(settings)
     linker.estimate_probability_two_random_records_match(deterministic_rules, recall=0.8)
     linker.estimate_u_using_random_sampling(target_rows=1e7)
