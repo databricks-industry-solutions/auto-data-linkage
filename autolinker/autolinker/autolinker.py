@@ -9,6 +9,8 @@ import hyperopt
 from hyperopt import fmin, tpe, hp, SparkTrials, STATUS_OK, Trials
 from hyperopt.pyll import scope
 
+import splink_mlflow
+
 import numpy as np
 import itertools
 import math
@@ -555,8 +557,8 @@ class AutoLinker:
     # Evaluate model
     evals = self.evaluate_linker(data, predictions, threshold, attribute_columns, unique_id, linker)
 
-    # Log to MLflow
-    with mlflow.start_run():
+    with mlflow.start_run() as run:
+      splink_mlflow.log_splink_model_to_mlflow(linker, "linker")
       mlflow.log_metrics(evals)
       mlflow.log_metric("training_duration", duration)
       params = space.copy()
