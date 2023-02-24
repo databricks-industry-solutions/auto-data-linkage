@@ -49,12 +49,14 @@ class AutoLinker:
     self.spark = spark
     self.catalog = catalog if catalog else spark.catalog.currentCatalog()
     self.schema = schema if schema else spark.catalog.currentDatabase()
-    self.experiment_name = experiment_name if experiment_name else f"Databricks Autolinker {str(datetime.datetime())}"
+    
+    self.username = spark.sql('select current_user() as user').collect()[0]['user']
+    self.experiment_name = experiment_name if experiment_name else f"/Users/{self.username}/Databricks Autolinker {str(datetime.now())}"
     self.training_columns = training_columns
     self.deterministic_columns = deterministic_columns
     self.best_params = None
     
-    mlflow.set_experiment(experiment_name)
+    mlflow.set_experiment(self.experiment_name)
 
 
     
@@ -611,7 +613,7 @@ class AutoLinker:
       
       loss = evals["mean_entropy_change"]
       
-      result = {'loss': loss, 'status': STATUS_OK}
+      result = {'loss': loss, 'status': STATUS_OK, 'run_id': run_id}
       for k, v in evals.items():
         result.update({k:v})
 
@@ -631,7 +633,9 @@ class AutoLinker:
     )
     
     best_param_for_rt = self._convert_hyperopt_to_splink()
-
+    
+    
+    self.best_run_id = self.trials.best_trial["result"]["run_id"]
     self.best_linker, self.best_predictions = self.train_linker(data, best_param_for_rt, attribute_columns, unique_id, self.deterministic_columns, self.training_columns)
         
     
@@ -663,4 +667,9 @@ class AutoLinker:
     print(success_text)
     
     return None
+  
+  def get_best_splink_model(self):
+    loaded_model = mlflow.pyfunc.load_model(f"runs:/{self.best_run_id}/linker")
+    unwrapped_model = loaded_model.unwrap_python_model()
+    return unwrapped_model
     
