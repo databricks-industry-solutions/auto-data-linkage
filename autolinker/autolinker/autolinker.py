@@ -567,8 +567,8 @@ class AutoLinker:
       mlflow.log_dict(params, "model_parameters.json")
       
     
-    
-    return linker, predictions, evals, params
+    run_id = run.info.run_id
+    return linker, predictions, evals, params, run_id
 
   
   
@@ -599,7 +599,7 @@ class AutoLinker:
     
     # define objective function
     def tune_model(space):
-      linker, predictions, evals, params = self.train_and_evaluate_linker(
+      linker, predictions, evals, params, run_id = self.train_and_evaluate_linker(
         data,
         space,
         attribute_columns,
