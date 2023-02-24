@@ -9,7 +9,7 @@ import hyperopt
 from hyperopt import fmin, tpe, hp, SparkTrials, STATUS_OK, Trials
 from hyperopt.pyll import scope
 
-import splink_mlflow
+from autolinker.autolinker import splink_mlflow
 
 import numpy as np
 import itertools
@@ -44,19 +44,19 @@ class AutoLinker:
   """
   
   
-  def __init__(self, spark, catalog, schema, experiment_name, training_columns=None, deterministic_columns=None):
+  def __init__(self, spark, catalog=None, schema=None, experiment_name=None, training_columns=None, deterministic_columns=None):
 
     self.spark = spark
-    self.catalog = catalog
-    self.schema = schema
-    self.experiment_name = experiment_name
+    self.catalog = catalog if catalog else spark.catalog.currentCatalog()
+    self.schema = schema if schema else spark.catalog.currentDatabase()
+    self.experiment_name = experiment_name if experiment_name else f"Databricks Autolinker {str(datetime.datetime())}"
     self.training_columns = training_columns
     self.deterministic_columns = deterministic_columns
     self.best_params = None
     
     mlflow.set_experiment(experiment_name)
 
-    
+
     
   def __str__(self):
     return f"AutoLinker instance working in {self.catalog}.{self.schema} and MLflow experiment {experiment_name}"
@@ -220,7 +220,7 @@ class AutoLinker:
     tables_in_schema = self.spark.sql(f"show tables from {self.catalog}.{self.schema} like '*__splink__*'").collect()
     for table in tables_in_schema:
       try:
-        self.spark.sql(f"drop table marcell_splink.marcell_autosplink.{table.tableName}") 
+        self.spark.sql(f"drop table {self.catalog}.{self.schema}.{table.tableName}") 
       except:
         self.spark.sql(f"drop table {table.tableName}")
         

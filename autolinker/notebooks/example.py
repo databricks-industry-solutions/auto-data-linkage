@@ -1,5 +1,5 @@
 # Databricks notebook source
-# MAGIC %pip install --quiet splink mlflow hyperopt
+# MAGIC %pip install --quiet splink # mlflow hyperopt
 
 # COMMAND ----------
 
@@ -28,9 +28,9 @@ data.display()
 
 autolinker = AutoLinker(
   spark=spark,                                                                                            # Spark instance
-  catalog="marcell_splink",                                                                               # catalog name
-  schema="marcell_autosplink",                                                                            # schema to write results to
-  experiment_name="/Users/marcell.ferencz@databricks.com/autosplink/evaluate/autosplink"                  # MLflow experiment location
+  catalog="robert_whiffin_uc",                                                                               # catalog name
+  schema="autosplink",                                                                            # schema to write results to
+  experiment_name="/Users/robert.whiffin@databricks.com/AutoSplink/rob_autosplink"                  # MLflow experiment location
 )
 
 # COMMAND ----------
@@ -40,7 +40,7 @@ autolinker.auto_link(
   attribute_columns=["givenname", "surname", "suburb", "postcode"],      # columns that contain attributes to compare
   unique_id="uid",                                                       # column name of the unique ID
   comparison_size_limit=200000,                                          # Maximum number of pairs when blocking applied
-  max_evals=1                                                            # Maximum number of hyperopt trials to run
+  max_evals=4                                                            # Maximum number of hyperopt trials to run
 )
 
 # COMMAND ----------
