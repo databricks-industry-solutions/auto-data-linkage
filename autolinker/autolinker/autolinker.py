@@ -9,6 +9,8 @@ import hyperopt
 from hyperopt import fmin, tpe, hp, SparkTrials, STATUS_OK, Trials
 from hyperopt.pyll import scope
 
+from autolinker.autolinker import splink_mlflow
+
 import numpy as np
 import itertools
 import math
@@ -42,19 +44,21 @@ class AutoLinker:
   """
   
   
-  def __init__(self, spark, catalog, schema, experiment_name, training_columns=None, deterministic_columns=None):
+  def __init__(self, spark, catalog=None, schema=None, experiment_name=None, training_columns=None, deterministic_columns=None):
 
     self.spark = spark
-    self.catalog = catalog
-    self.schema = schema
-    self.experiment_name = experiment_name
+    self.catalog = catalog if catalog else spark.catalog.currentCatalog()
+    self.schema = schema if schema else spark.catalog.currentDatabase()
+    
+    self.username = spark.sql('select current_user() as user').collect()[0]['user']
+    self.experiment_name = experiment_name if experiment_name else f"/Users/{self.username}/Databricks Autolinker {str(datetime.now())}"
     self.training_columns = training_columns
     self.deterministic_columns = deterministic_columns
     self.best_params = None
     
-    mlflow.set_experiment(experiment_name)
+    mlflow.set_experiment(self.experiment_name)
 
-    
+
     
   def __str__(self):
     return f"AutoLinker instance working in {self.catalog}.{self.schema} and MLflow experiment {experiment_name}"
@@ -218,7 +222,7 @@ class AutoLinker:
     tables_in_schema = self.spark.sql(f"show tables from {self.catalog}.{self.schema} like '*__splink__*'").collect()
     for table in tables_in_schema:
       try:
-        self.spark.sql(f"drop table marcell_splink.marcell_autosplink.{table.tableName}") 
+        self.spark.sql(f"drop table {self.catalog}.{self.schema}.{table.tableName}") 
       except:
         self.spark.sql(f"drop table {table.tableName}")
         
@@ -555,8 +559,8 @@ class AutoLinker:
     # Evaluate model
     evals = self.evaluate_linker(data, predictions, threshold, attribute_columns, unique_id, linker)
 
-    # Log to MLflow
-    with mlflow.start_run():
+    with mlflow.start_run() as run:
+      splink_mlflow.log_splink_model_to_mlflow(linker, "linker")
       mlflow.log_metrics(evals)
       mlflow.log_metric("training_duration", duration)
       params = space.copy()
@@ -565,8 +569,8 @@ class AutoLinker:
       mlflow.log_dict(params, "model_parameters.json")
       
     
-    
-    return linker, predictions, evals, params
+    run_id = run.info.run_id
+    return linker, predictions, evals, params, run_id
 
   
   
@@ -597,7 +601,7 @@ class AutoLinker:
     
     # define objective function
     def tune_model(space):
-      linker, predictions, evals, params = self.train_and_evaluate_linker(
+      linker, predictions, evals, params, run_id = self.train_and_evaluate_linker(
         data,
         space,
         attribute_columns,
@@ -609,7 +613,7 @@ class AutoLinker:
       
       loss = evals["mean_entropy_change"]
       
-      result = {'loss': loss, 'status': STATUS_OK}
+      result = {'loss': loss, 'status': STATUS_OK, 'run_id': run_id}
       for k, v in evals.items():
         result.update({k:v})
 
@@ -629,7 +633,9 @@ class AutoLinker:
     )
     
     best_param_for_rt = self._convert_hyperopt_to_splink()
-
+    
+    
+    self.best_run_id = self.trials.best_trial["result"]["run_id"]
     self.best_linker, self.best_predictions = self.train_linker(data, best_param_for_rt, attribute_columns, unique_id, self.deterministic_columns, self.training_columns)
         
     
@@ -661,4 +667,9 @@ class AutoLinker:
     print(success_text)
     
     return None
+  
+  def get_best_splink_model(self):
+    loaded_model = mlflow.pyfunc.load_model(f"runs:/{self.best_run_id}/linker")
+    unwrapped_model = loaded_model.unwrap_python_model()
+    return unwrapped_model
     
