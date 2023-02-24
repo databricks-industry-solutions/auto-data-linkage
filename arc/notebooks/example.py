@@ -3,7 +3,7 @@
 
 # COMMAND ----------
 
-from autolinker.autolinker.autolinker import AutoLinker
+from arc.autolinker.autolinker import AutoLinker
 
 # COMMAND ----------
 
