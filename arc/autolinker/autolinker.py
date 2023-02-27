@@ -146,8 +146,12 @@ class AutoLinker:
     comp_size_dict = dict()
 
     for comb, rule in zip(blocking_combinations, blocking_rules):
-      num_pairs = data.groupBy(list(comb)).count().select(F.sum(F.col("count")*F.col("count"))).collect()[0]["sum((count * count))"]
+      num_pairs = data.groupBy(list(comb)).count().select((F.sum(F.col("count")*(F.col("count")-F.lit(1))))/F.lit(2)).collect()[0]["(sum((count * (count - 1))) / 2)"]
       comp_size_dict.update({rule: num_pairs})
+    
+    if not comparison_size_limit:
+      comparison_size_limit = min(comp_size_dict.values())*2
+      
     
     # loop through all combinations of combinations and save those which remain under the limit (this is a bit brute force)
     accepted_rules = []
@@ -158,7 +162,8 @@ class AutoLinker:
 
 
     if len(accepted_rules)<1:
-      raise ValueError("No blocking rules meet the comparison size limit.")
+      min_size = min(comp_size_dict.values())
+      raise ValueError(f"No blocking rules meet the comparison size limit. Minimum pair space = {min_size}")
           
     return accepted_rules
 
@@ -575,7 +580,7 @@ class AutoLinker:
 
   
   
-  def auto_link(self, data, attribute_columns, unique_id, comparison_size_limit, max_evals, cleaning="all", deterministic_columns=None, training_columns=None, threshold=0.9):
+  def auto_link(self, data, attribute_columns, unique_id, max_evals, comparison_size_limit=None, cleaning="all", deterministic_columns=None, training_columns=None, threshold=0.9):
     """
     Method to run a series of hyperopt trials.
     Parameters

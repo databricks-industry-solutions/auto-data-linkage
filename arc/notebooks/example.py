@@ -13,18 +13,14 @@ from arc.autolinker.autolinker import AutoLinker
 
 # COMMAND ----------
 
-data = spark.read.table("marcell_autosplink.voters_data_sample")
-
-# COMMAND ----------
-
-# this is here to set defaults - Autolinker() will use the spark default catalog and database if not provided as args
-spark.sql("use catalog robert_whiffin_uc")
-spark.sql("use database autosplink")
+# DBTITLE 1,Load the data and verify its size.
+from pyspark.sql.functions import monotonically_increasing_id
+data = spark.read.table("marcell_autosplink.voters_data").withColumn('uid', monotonically_increasing_id())
+data.count()
 
 # COMMAND ----------
 
 data.display()
-
 
 # COMMAND ----------
 
@@ -33,16 +29,20 @@ data.display()
 
 # COMMAND ----------
 
-autolinker = AutoLinker()
+# DBTITLE 1,Create new linker object
+autolinker = AutoLinker(
+  catalog = "robert_whiffin_uc", schema="autosplink" # optional arguments to determine where internal tables are stored
+)
 
 # COMMAND ----------
 
+# DBTITLE 1,Set autolinking settings
 autolinker.auto_link(
   data=data,                                                             # dataset to dedupe
   attribute_columns=["givenname", "surname", "suburb", "postcode"],      # columns that contain attributes to compare
   unique_id="uid",                                                       # column name of the unique ID
-  comparison_size_limit=200000,                                          # Maximum number of pairs when blocking applied
-  max_evals=10                                                            # Maximum number of hyperopt trials to run
+  comparison_size_limit=300e6,                                          # Maximum number of pairs when blocking applied
+  max_evals=1                                                            # Maximum number of hyperopt trials to run
 )
 
 # COMMAND ----------
