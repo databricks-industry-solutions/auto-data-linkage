@@ -681,18 +681,45 @@ class AutoLinker:
     return None
   
   def get_best_splink_model(self):
+    """
+    Get the underlying Splink model from the MLFlow Model Registry. Useful for advanced users wishing to access Splink's
+    internal functionality not exposed as part of arc Autolinker.
+    Returns
+    -------
+    A Splink model object.
+    """
     loaded_model = mlflow.pyfunc.load_model(f"runs:/{self.best_run_id}/linker")
     unwrapped_model = loaded_model.unwrap_python_model()
     return unwrapped_model
   
   def best_predictions(self):
+    """
+    Get the predictions from the best linker model trained.
+    Returns
+    -------
+    A spark dataframe of the pairwise predictions made by the autolinker model.
+    """
     return self.best_predictions_df.as_spark_dataframe()
   
   def _do_clustering(self):
+    #factor out the clustering call as used multiple times
     clusters = self.best_linker.cluster_pairwise_predictions_at_threshold(self.best_predictions_df, self.cluster_threshold)
     self.clusters = clusters
   
   def best_clusters_at_threshold(self, threshold=0.8):
+    """
+    Convert the pairwise predictions to clusters using the connected components algorithm.
+
+    Parameters
+    ----------
+    threshold : default value=0.8.An optional parameter controlling the threshold at which records will be connected.
+                Set it higher to produce clusters with greater precision, lower to produce clusters with greater recall.
+
+    Returns
+    -------
+    A spark dataframe of the clustered input data with a new column cluster_id prepended.
+
+    """
     # if self.clusters is empty run clustering and log the threshold
     if not self.clusters:
       self.cluster_threshold=threshold
@@ -708,10 +735,23 @@ class AutoLinker:
     return self.clusters.as_spark_dataframe()
         
   
-  def cluster_viewer(self, clusters=None):
+  def cluster_viewer(self):
+    """
+    Produce an interactive dashboard for visualising clusters. It provides examples of clusters of different sizes.
+    The shape and size of clusters can be indicative of problems with record linkage, so it provides a tool to help you
+     find potential false positive and negative links.
+    See this video for an indepth explanation of interpreting this dashboard: https://www.youtube.com/watch?v=DNvCMqjipis
+
+    Writes a HTML file to DBFS at "/dbfs/Users/{username}/scv.html"
+
+    Returns
+    -------
+
+    """
     # do clustering if not already done and no clusters provided
-    if not self.clusters and not clusters:
-      self._do_clustering()
+    if not self.clusters:
+      raise ValueError("Pairs have not yet been clustered. Please run best_clusters_at_threshold() with an optional"
+                       "threshold argument to generate clusters. ")
       
     path=f"/Users/{self.username}/clusters.html"
     self.best_linker.cluster_studio_dashboard(self.best_predictions_df, self.clusters, path, sampling_method="by_cluster_size", overwrite=True)
@@ -724,6 +764,16 @@ class AutoLinker:
     
     
   def comparison_viewer(self):
+    """
+    Produce an interactive dashboard for querying comparison details.
+    See this video for an indepth explanation of interpreting this dashboard: https://www.youtube.com/watch?v=DNvCMqjipis
+
+    Writes a HTML file to DBFS at "/dbfs/Users/{username}/scv.html"
+
+    Returns None.
+    -------
+
+    """
     path=f"/dbfs/Users/{self.username}/scv.html"
 
     self.best_linker.comparison_viewer_dashboard(self.best_predictions_df, path, overwrite=True)
@@ -735,6 +785,12 @@ class AutoLinker:
  
 
   def match_weights_chart(self):
+    """
+    Get the
+    Returns
+    -------
+
+    """
     return self.best_linker.match_weights_chart()
     
     
