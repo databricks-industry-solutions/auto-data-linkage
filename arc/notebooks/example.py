@@ -17,7 +17,14 @@ data = spark.read.table("marcell_autosplink.voters_data_sample")
 
 # COMMAND ----------
 
+# this is here to set defaults - Autolinker() will use the spark default catalog and database if not provided as args
+spark.sql("use catalog robert_whiffin_uc")
+spark.sql("use database autosplink")
+
+# COMMAND ----------
+
 data.display()
+
 
 # COMMAND ----------
 
@@ -26,12 +33,7 @@ data.display()
 
 # COMMAND ----------
 
-autolinker = AutoLinker(
-  spark=spark,                                                                                            # Spark instance
-  catalog="robert_whiffin_uc",                                                                               # catalog name
-  schema="autosplink",                                                                            # schema to write results to
-  #experiment_name="/Users/robert.whiffin@databricks.com/AutoSplink/rob_autosplink"                  # MLflow experiment location
-)
+autolinker = AutoLinker()
 
 # COMMAND ----------
 
@@ -40,26 +42,35 @@ autolinker.auto_link(
   attribute_columns=["givenname", "surname", "suburb", "postcode"],      # columns that contain attributes to compare
   unique_id="uid",                                                       # column name of the unique ID
   comparison_size_limit=200000,                                          # Maximum number of pairs when blocking applied
-  max_evals=1                                                            # Maximum number of hyperopt trials to run
+  max_evals=10                                                            # Maximum number of hyperopt trials to run
 )
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC # Test Splink functionality
+display(
+  autolinker.best_predictions()
+)
 
 # COMMAND ----------
 
-best_linker = autolinker.best_linker
+import pyspark.sql.functions as F
+from pyspark.sql import Window
 
-best_linker.m_u_parameters_chart()
+display(
+  autolinker.best_clusters_at_threshold()# default=0.8
+  .withColumn("size", F.count("*").over(Window.partitionBy("cluster_id")))
+  .orderBy(-F.col("size"))
+)
 
 # COMMAND ----------
 
-predictions = autolinker.best_predictions
-
-predictions.as_spark_dataframe().display()
+autolinker.cluster_viewer()
 
 # COMMAND ----------
 
-best_linker
+autolinker.comparison_viewer()
+
+# COMMAND ----------
+
+autolinker.match_weights_chart()
+

@@ -1,5 +1,6 @@
 from pyspark.sql import functions as F
 from pyspark.sql.types import *
+from dbruntime.display import displayHTML
 
 from splink.spark.spark_linker import SparkLinker
 from splink.databricks.enable_splink import enable_splink
@@ -46,20 +47,19 @@ class AutoLinker:
   
   def __init__(self, spark=None, catalog=None, schema=None, experiment_name=None, training_columns=None, deterministic_columns=None):
 
-    self.spark = spark
-    self.catalog = catalog if catalog else spark.catalog.currentCatalog()
-    self.schema = schema if schema else spark.catalog.currentDatabase()
+    self.spark = spark 
+    self.catalog = catalog# if catalog else spark.catalog.currentCatalog()
+    self.schema = schema  #. if schema else spark.catalog.currentDatabase()
     
-    self.username = spark.sql('select current_user() as user').collect()[0]['user']
-    self.experiment_name = experiment_name if experiment_name else f"/Users/{self.username}/Databricks Autolinker {str(datetime.now())}"
+    #self.username = spark.sql('select current_user() as user').collect()[0]['user']
+    self.experiment_name = experiment_name #if experiment_name else f"/Users/{self.username}/Databricks Autolinker {str(datetime.now())}"
     self.training_columns = training_columns
     self.deterministic_columns = deterministic_columns
     self.best_params = None
+    self.clusters=None
+    self.cluster_threshold=None
     
-    mlflow.set_experiment(self.experiment_name)
 
-
-    
   def __str__(self):
     return f"AutoLinker instance working in {self.catalog}.{self.schema} and MLflow experiment {experiment_name}"
   
@@ -449,6 +449,7 @@ class AutoLinker:
       - tuple of trained linker object and Splink dataframe with predictions
     """
 
+
     # Drop any intermediate tables for a clean run
     self._drop_intermediate_tables()
     
@@ -486,9 +487,10 @@ class AutoLinker:
       "em_convergence": 0.01,
       "blocking_rules_to_generate_predictions": blocking_rules_to_generate_predictions
     }
-
+    
     # Train linker model
     linker = SparkLinker(data, spark=self.spark, database=self.schema, catalog=self.catalog)
+    
     linker.initialise_settings(settings)
     linker.estimate_probability_two_random_records_match(deterministic_rules, recall=0.8)
     linker.estimate_u_using_random_sampling(target_rows=1e7)
@@ -497,7 +499,6 @@ class AutoLinker:
 
     # Make predictions
     predictions = linker.predict()
-
 
     return linker, predictions
   
@@ -543,7 +544,7 @@ class AutoLinker:
     : training_columns : list of strings containing training columns - if None, they will be generated automatically/randomly
     : threshold : float indicating the probability threshold above which a pair is considered a match
     Returns
-      - 6-tuple of trained linker (SparkLinker instance), predictions (Splink DAtaFrame) and metrics (4x float)
+      - 7-tuple of trained linker (SparkLinker instance), predictions (Splink DAtaFrame) and metrics (4x float) and mlflow run_id
     """
 
     #set start time for measuring training duration
@@ -594,7 +595,15 @@ class AutoLinker:
     
     # extract spark from input data
 
-    self.spark = data.spark if not self.spark else self.spark
+    self.spark = data.sparkSession if not self.spark else self.spark
+    self.catalog = self.catalog if self.catalog else self.spark.catalog.currentCatalog()
+    self.schema = self.schema   if self.schema else self.spark.catalog.currentDatabase()
+    
+    self.username = self.spark.sql('select current_user() as user').collect()[0]['user']
+    self.experiment_name = self.experiment_name if self.experiment_name else f"/Users/{self.username}/Databricks Autolinker {str(datetime.now())}"
+    self.best_params = None
+    
+    mlflow.set_experiment(self.experiment_name)
 
     # Count rows in data - doing this here so we only do it once
     self.data_rowcount = data.count()
@@ -625,21 +634,21 @@ class AutoLinker:
     # initialise trials and create hyperopt space
     self.trials = Trials()
     space = self._create_hyperopt_space(data, attribute_columns, comparison_size_limit, unique_id)
-
-    # run hyperopt trials
+    
+      # run hyperopt trials
     self.best = fmin(
-      fn=tune_model,
-      space=space,
-      algo=tpe.suggest,
-      max_evals=max_evals,
-      trials=self.trials
-    )
+        fn=tune_model,
+        space=space,
+        algo=tpe.suggest,
+        max_evals=max_evals,
+        trials=self.trials
+      )
     
     best_param_for_rt = self._convert_hyperopt_to_splink()
     
     
     self.best_run_id = self.trials.best_trial["result"]["run_id"]
-    self.best_linker, self.best_predictions = self.train_linker(data, best_param_for_rt, attribute_columns, unique_id, self.deterministic_columns, self.training_columns)
+    self.best_linker, self.best_predictions_df = self.train_linker(data, best_param_for_rt, attribute_columns, unique_id, self.deterministic_columns, self.training_columns)
         
     
     # return succes text
@@ -664,7 +673,7 @@ class AutoLinker:
     You can now access the best linker model and predictions and use Splink's built-in functionality, e.g.:
     
     >>> linker = arc.best_linker
-    >>> predictions = arc.best_predictions
+    >>> predictions = arc.best_predictions()
     >>> ...
     """
     print(success_text)
@@ -675,4 +684,57 @@ class AutoLinker:
     loaded_model = mlflow.pyfunc.load_model(f"runs:/{self.best_run_id}/linker")
     unwrapped_model = loaded_model.unwrap_python_model()
     return unwrapped_model
+  
+  def best_predictions(self):
+    return self.best_predictions_df.as_spark_dataframe()
+  
+  def _do_clustering(self):
+    clusters = self.best_linker.cluster_pairwise_predictions_at_threshold(self.best_predictions_df, self.cluster_threshold)
+    self.clusters = clusters
+  
+  def best_clusters_at_threshold(self, threshold=0.8):
+    # if self.clusters is empty run clustering and log the threshold
+    if not self.clusters:
+      self.cluster_threshold=threshold
+      self._do_clustering()
+    # enter this clause if rerunning clustering. 
+    else:
+      # if the provided threshold is the same as last time, no need to recalculate
+      if threshold == self.cluster_threshold:
+        pass
+      else:
+        self.cluster_threshold=threshold
+        self._do_clustering()
+    return self.clusters.as_spark_dataframe()
+        
+  
+  def cluster_viewer(self, clusters=None):
+    # do clustering if not already done and no clusters provided
+    if not self.clusters and not clusters:
+      self._do_clustering()
+      
+    path=f"/Users/{self.username}/clusters.html"
+    self.best_linker.cluster_studio_dashboard(self.best_predictions_df, self.clusters, path, sampling_method="by_cluster_size", overwrite=True)
+    
+    # splink automatically prepends /dbfs to the output path
+    with open("/dbfs" + path, "r") as f:
+        html2=f.read()
+    
+    displayHTML(html2)
+    
+    
+  def comparison_viewer(self):
+    path=f"/dbfs/Users/{self.username}/scv.html"
+
+    self.best_linker.comparison_viewer_dashboard(self.best_predictions_df, path, overwrite=True)
+
+    with open("/dbfs" + path, "r") as f:
+        html=f.read()
+
+    displayHTML(html)
+ 
+
+  def match_weights_chart(self):
+    return self.best_linker.match_weights_chart()
+    
     
