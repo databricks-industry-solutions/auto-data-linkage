@@ -29,15 +29,10 @@ class ResultsCollector:
 
 TIME_NOW = datetime.datetime.now()
 GIT_COMMIT = dbutils.widgets.get("git_commit")
+GIT_COMMIT
+
 
 # COMMAND ----------
-
-user = spark.sql("select current_user()").collect()[0]["current_user()"]
-
-# COMMAND ----------
-
-# Prepare to run pytest from the repo.
-os.chdir(f"/Workspace/Repos/{user}/splink-public-sector-hackathon/arc/tests")
 
 sys.dont_write_bytecode = True
 
