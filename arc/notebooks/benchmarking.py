@@ -3,6 +3,11 @@
 
 # COMMAND ----------
 
+from arc.autolinker.autolinker import AutoLinker
+from arc.autolinker.empirical_evaluations import calculate_empirical_score
+
+# COMMAND ----------
+
 # MAGIC %md
 # MAGIC # Read Data
 # MAGIC Data downloaded and sampled from https://dbs.uni-leipzig.de/research/projects/object_matching/benchmark_datasets_for_entity_resolution
@@ -10,12 +15,11 @@
 # COMMAND ----------
 
 # DBTITLE 1,Load the data and verify its size.
-data = spark.read.table("marcell_autosplink.voters_data_sample")
-data.count()
+voter_data = spark.read.table("marcell_autosplink.voters_data_sample")
 
 # COMMAND ----------
 
-data.display()
+voter_data.display()
 
 # COMMAND ----------
 
@@ -24,21 +28,21 @@ data.display()
 
 # COMMAND ----------
 
-from arc.autolinker.autolinker import AutoLinker
-
-# COMMAND ----------
-
 # DBTITLE 1,Create new linker object
-autolinker = AutoLinker()
+autolinker = AutoLinker(
+  catalog = "robert_whiffin_uc", schema="autosplink" # optional arguments to determine where internal tables are stored
+  , experiment_name="/Users/robert.whiffin@databricks.com/voter_data_benchmark_photon"
+)
 
 # COMMAND ----------
 
 # DBTITLE 1,Set autolinking settings
 autolinker.auto_link(
-  data=data,                                                             # dataset to dedupe
+  data=voter_data,                                                             # dataset to dedupe
   attribute_columns=["givenname", "surname", "suburb", "postcode"],      # columns that contain attributes to compare
   unique_id="uid",                                                       # column name of the unique ID
-  max_evals=4,                                                            # Maximum number of trials to run
+  max_evals=600,                                                            # Maximum number of trials to run
+  true_id="recid"
 )
 
 # COMMAND ----------

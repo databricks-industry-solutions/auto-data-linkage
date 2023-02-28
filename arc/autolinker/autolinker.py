@@ -17,6 +17,7 @@ import itertools
 import math
 import random
 from datetime import datetime
+from time import time
 
 import mlflow
 
@@ -58,7 +59,7 @@ class AutoLinker:
     self.best_params = None
     self.clusters=None
     self.cluster_threshold=None
-    
+    self.df_true_positives=None
 
   def __str__(self):
     return f"AutoLinker instance working in {self.catalog}.{self.schema} and MLflow experiment {experiment_name}"
@@ -78,13 +79,16 @@ class AutoLinker:
     """
     
     # calculate normalised value count per unique value in colunn
+    # will always be between 0 and 1
     vc = data.groupBy(column).count().withColumn("norm_count", F.col("count")/self.data_rowcount)
 
     
     # Calculate P*ln(P) per row
+    # will always be  <= 0
     vc = vc.withColumn("entropy", F.col("norm_count")*F.log(F.col("norm_count")))
     
     # Entropy = -SUM(P*ln(P))
+    # will always be >=0
     entropy = -vc.select(F.sum(F.col("entropy")).alias("sum_entropy")).collect()[0].sum_entropy
 
     
@@ -537,7 +541,15 @@ class AutoLinker:
   
   
   
-  def train_and_evaluate_linker(self, data, space, attribute_columns, unique_id, deterministic_columns=None, training_columns=None, threshold=0.9):
+  def train_and_evaluate_linker(self
+                                , data
+                                , space
+                                , attribute_columns
+                                , unique_id
+                                , deterministic_columns=None
+                                , training_columns=None
+                                , threshold=0.9
+                                , true_id=None):
     """
     Method to train and evaluate a linker model in one go
     Parameters
@@ -564,6 +576,15 @@ class AutoLinker:
     
     # Evaluate model
     evals = self.evaluate_linker(data, predictions, threshold, attribute_columns, unique_id, linker)
+    
+    if true_id:
+      precision, recall, f1 = self._calculate_empirical_score(data, predictions, unique_id, threshold, true_id)
+      ground_truth_metrics = {
+          "precision":precision
+        , "recall":recall
+        , "f1":f1
+      }
+       
 
     with mlflow.start_run() as run:
       splink_mlflow.log_splink_model_to_mlflow(linker, "linker")
@@ -573,6 +594,9 @@ class AutoLinker:
       params["deterministic_columns"] = self.deterministic_columns
       params["training_columns"] = self.training_columns
       mlflow.log_dict(params, "model_parameters.json")
+      mlflow.log_metric("run_end_time", time())
+      if true_id:
+        mlflow.log_metrics(ground_truth_metrics)
       
     
     run_id = run.info.run_id
@@ -580,7 +604,17 @@ class AutoLinker:
 
   
   
-  def auto_link(self, data, attribute_columns, unique_id, max_evals, comparison_size_limit=None, cleaning="all", deterministic_columns=None, training_columns=None, threshold=0.9):
+  def auto_link(self
+                , data
+                , attribute_columns
+                , unique_id, max_evals
+                , comparison_size_limit=None
+                , cleaning="all"
+                , deterministic_columns=None
+                , training_columns=None
+                , threshold=0.9
+                , true_id=None
+               ):
     """
     Method to run a series of hyperopt trials.
     Parameters
@@ -625,7 +659,8 @@ class AutoLinker:
         unique_id=unique_id,
         deterministic_columns=self.deterministic_columns,
         training_columns=self.training_columns,
-        threshold=threshold
+        threshold=threshold,
+        true_id=true_id
       )
       
       loss = evals["mean_entropy_change"]
@@ -797,5 +832,87 @@ class AutoLinker:
 
     """
     return self.best_linker.match_weights_chart()
+  
+  
+  def _calculate_empirical_score(self, data, predictions, unique_id, threshold, true_id):
+    """
+    Method to calculate precision, recall and F1 score based on ground truth labels.
+    Assumes the data has a column with empirical IDs to assess whether two records belong
+    to the same real life entity. Will check if this has already been calculated. If not,
+    it will create it for the first (and only) time.
+    NB: this includes a bit of hard coding, but it won't make it to production anyway because
+    we won't have ground truth.
+    Parameters
+    : data : Spark DataFrame containing the data to be de-duplicated
+    : predictions : Splink DataFrame with predicted pairs
+    : threshold : float indicating the probability threshold above which a pair is considered a match
+    Returns
+      - 3-tuple of floats for precision, recall and F1 score
+    """
+    data = data.withColumn("recid", F.col(true_id))
+    if not self.df_true_positives:
+      # filter original data to only contain rows where recid id appears more than once (known dupes)
+      data_recid_groupby = data.groupBy("recid").count().filter("count>1").withColumnRenamed("recid", "recid_")
+      data_tp = data.join(data_recid_groupby, data.recid==data_recid_groupby.recid_, how="inner").drop("recid_")
+
+      data_l = data_tp.withColumnRenamed(unique_id, f"{unique_id}_l").withColumnRenamed("recid", "recid_l").select(f"{unique_id}_l", "recid_l")
+      data_r = data_tp.withColumnRenamed(unique_id, f"{unique_id}_r").withColumnRenamed("recid", "recid_r").select(f"{unique_id}_r", "recid_r")
+
+      dt = data_l.join(data_r, data_l[f"{unique_id}_l"]!=data_r[f"{unique_id}_r"], how="inner")
+      # create boolean col for y_true
+      df_true = dt.withColumn("match", F.when(F.col("recid_l")==F.col("recid_r"), 1).otherwise(0))
+      # only keep matches
+      df_true = df_true.filter("match=1")
+      # assign as attribute to avoid re-calculation
+      self.df_true_positives = df_true
+      
+    # convert predictions to Spark DataFrame and filter on match prob threshold - table will only contain predicted positives
+    df_pred = predictions.as_spark_dataframe().filter(f"match_probability>={threshold}")
+    
+    # Calculate TP, FP, FN, TN
+    
+    # TP is the inner join of true and predicted pairs
+    tp = df_pred.join(
+      self.df_true_positives,
+      ((df_pred[f"{unique_id}_l"]==self.df_true_positives[f"{unique_id}_r"]) & (df_pred[f"{unique_id}_l"]==self.df_true_positives[f"{unique_id}_r"])) | ((df_pred[f"{unique_id}_l"]==self.df_true_positives[f"{unique_id}_r"]) & (df_pred[f"{unique_id}_r"]==self.df_true_positives[f"{unique_id}_l"])),
+      how="inner"
+    ).count()
+    
+    # FN is the left anti-join of true and predicted
+    fn = self.df_true_positives.join(
+      df_pred,
+      ((df_pred[f"{unique_id}_l"]==self.df_true_positives[f"{unique_id}_l"]) & (df_pred[f"{unique_id}_r"]==self.df_true_positives[f"{unique_id}_r"])) | ((df_pred[f"{unique_id}_l"]==self.df_true_positives[f"{unique_id}_r"]) & (df_pred[f"{unique_id}_r"]==self.df_true_positives[f"{unique_id}_l"])),
+      how="left_anti"
+    ).count()
+    
+    # FP is the left anti-join of predicted and true
+    fp = df_pred.join(
+      self.df_true_positives,
+      ((df_pred[f"{unique_id}_l"]==self.df_true_positives[f"{unique_id}_l"]) & (df_pred[f"{unique_id}_r"]==self.df_true_positives[f"{unique_id}_r"])) | ((df_pred[f"{unique_id}_l"]==self.df_true_positives[f"{unique_id}_r"]) & (df_pred[f"{unique_id}_r"]==self.df_true_positives[f"{unique_id}_l"])),
+      how="left_anti"
+    ).count()
+    
+    # TN is everything else, i.e. N(N-1)-TP-FN-FP
+    N = data.count()
+    tn = (N*(N-1))-tp-fn-fp
+    
+    # Calculate precision, recall and f1
+    if tp+fp>0.0:
+      precision = tp/(tp+fp)
+    else:
+      precision: 0.9
+      
+    if tp+fn>0.0:
+      recall = tp/(tp+fn)
+    else:
+      recall = 0.0
+
+    if (precision+recall)>0:
+      f1 = precision*recall/(precision+recall)
+    else:
+      f1 = 0.0
+      
+    return precision, recall, f1
+  
     
     
