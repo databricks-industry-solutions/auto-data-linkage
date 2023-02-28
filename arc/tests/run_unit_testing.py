@@ -48,7 +48,7 @@ sys.dont_write_bytecode = True
 # COMMAND ----------
 
 collector = ResultsCollector()
-pytest.main(args=[".", "-p","no:cacheprovider"], plugins=[collector])
+pytest.main(args=[root_dir, "-p","no:cacheprovider"], plugins=[collector])
 
 # COMMAND ----------
 
