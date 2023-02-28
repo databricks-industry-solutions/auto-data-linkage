@@ -3,6 +3,10 @@
 
 # COMMAND ----------
 
+dbutils.widgets.text("git_commit", "unknown")
+
+# COMMAND ----------
+
 import pytest
 import os
 import sys
@@ -24,7 +28,7 @@ class ResultsCollector:
 # COMMAND ----------
 
 TIME_NOW = datetime.datetime.now()
-TIME_NOW
+GIT_COMMIT = dbutils.widgets.get("git_commit")
 
 # COMMAND ----------
 
@@ -42,13 +46,13 @@ sys.dont_write_bytecode = True
 # COMMAND ----------
 
 collector = ResultsCollector()
-r = pytest.main(args=[".", "-vv", "-p","no:cacheprovider"], plugins=[collector])
+pytest.main(args=[".", "-p","no:cacheprovider"], plugins=[collector])
 
 # COMMAND ----------
 
 test_report = spark.createDataFrame([
-  (TIME_NOW, report.head_line, report.duration, report.outcome, report.passed, report.failed) for report in collector.reports
-], ["test_run_timestamp", "test_name", "test_duration", "outcome", "passed", "failed"])
+  (TIME_NOW, GIT_COMMIT, report.head_line, report.duration, report.outcome, report.passed, report.failed) for report in collector.reports
+], ["test_run_timestamp", "git_commit", "test_name", "test_duration", "outcome", "passed", "failed"])
 
 # COMMAND ----------
 
