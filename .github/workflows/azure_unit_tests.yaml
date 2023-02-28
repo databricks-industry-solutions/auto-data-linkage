@@ -34,7 +34,7 @@ jobs:
            }
          notebook-params-json: >
            {
-            "git_commit": ${{ github.event.pull_request.head.sha }}
+            "git_commit": "${{ github.event.pull_request.head.sha }}"
            }
          access-control-list-json: >
            [
