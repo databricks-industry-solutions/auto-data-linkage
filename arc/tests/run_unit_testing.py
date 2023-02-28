@@ -40,7 +40,7 @@ notebook_path = dbutils.notebook.entry_point.getDbutils().notebook().getContext(
 repo_root = os.path.dirname(os.path.dirname(notebook_path))
 
 # Prepare to run pytest from the repo.
-os.chdir(f"/Workspace{repo_root}")
+root_dir = f"/Workspace{repo_root}"
 print(os.getcwd())
 sys.dont_write_bytecode = True
 
