@@ -35,7 +35,7 @@ GIT_COMMIT
 # COMMAND ----------
 
 sys.dont_write_bytecode = True
-
+os.getcwd()
 
 
 # COMMAND ----------
