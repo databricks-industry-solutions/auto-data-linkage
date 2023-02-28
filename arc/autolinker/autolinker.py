@@ -28,7 +28,6 @@ class AutoLinker:
   Basic usage:
   
   >>> arc = AutoLinker(
-  ...   spark=spark                              # Spark instance
   ...   catalog="splink_catalog",                # catalog name
   ...   schema="splink_schema",                  # schema to write results to
   ...   experiment_name="autosplink_experiment"  # MLflow experiment location
@@ -252,7 +251,7 @@ class AutoLinker:
       
     for col, methods in cleaning.items():
       # if column is not a string, skip it
-      if not data.schema[col].dataType.typeName == "string":
+      if not data.schema[col].dataType == StringType():
         continue
         
       for method in methods:
