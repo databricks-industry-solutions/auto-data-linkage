@@ -34,8 +34,15 @@ GIT_COMMIT
 
 # COMMAND ----------
 
+notebook_path = dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get()
+
+# Get the repo's root directory name.
+repo_root = os.path.dirname(os.path.dirname(notebook_path))
+
+# Prepare to run pytest from the repo.
+os.chdir(f"/Workspace{repo_root}")
+print(os.getcwd())
 sys.dont_write_bytecode = True
-os.getcwd()
 
 
 # COMMAND ----------
