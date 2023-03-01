@@ -162,7 +162,7 @@ class AutoLinker:
     for r in range(2, len(blocking_rules)+1):
       for c in itertools.combinations(blocking_rules, r):
         rule_size = sum([v for k, v in comp_size_dict.items() if k in c])
-        accepted_rules.append(list(c, rule_size))
+        potential_rules.append(list([c, rule_size]))
 
     # take the bottom 4 rules by size if no comparison size is returned
     if not comparison_size_limit:
