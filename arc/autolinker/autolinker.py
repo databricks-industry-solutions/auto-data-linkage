@@ -1,4 +1,5 @@
 from pyspark.sql import functions as F
+from pyspark.sql import Window
 from pyspark.sql.types import *
 from dbruntime.display import displayHTML
 
@@ -83,14 +84,16 @@ class AutoLinker:
     vc = data.groupBy(column).count().withColumn("norm_count", F.col("count")/self.data_rowcount)
 
     
-    # Calculate P*ln(P) per row
+    # Calculate P*ln(P) per row. Milos idea: e^P+ln(ln(P)) 
     # will always be  <= 0
     vc = vc.withColumn("entropy", F.col("norm_count")*F.log(F.col("norm_count")))
     
     # Entropy = -SUM(P*ln(P))
     # will always be >=0
     entropy = -vc.select(F.sum(F.col("entropy")).alias("sum_entropy")).collect()[0].sum_entropy
-
+    
+    # make it bigger to get away from zero
+    entropy = np.exp(entropy)
     
     return entropy
   
@@ -142,7 +145,8 @@ class AutoLinker:
     for n in range(1, max_columns_per_rule+1):
       combs = list(itertools.combinations(attribute_columns, n))
       blocking_combinations.extend(combs)
-
+      
+    
     # Convert them to Splink-compatible rules
     blocking_rules = self._generate_rules(["&".join(r) for r in blocking_combinations])
     
@@ -153,16 +157,25 @@ class AutoLinker:
       num_pairs = data.groupBy(list(comb)).count().select((F.sum(F.col("count")*(F.col("count")-F.lit(1))))/F.lit(2)).collect()[0]["(sum((count * (count - 1))) / 2)"]
       comp_size_dict.update({rule: num_pairs})
     
-    if not comparison_size_limit:
-      comparison_size_limit = min(comp_size_dict.values())*2
-      
-    
-    # loop through all combinations of combinations and save those which remain under the limit (this is a bit brute force)
-    accepted_rules = []
-    for r in range(1, len(blocking_rules)+1):
+    # we want all rule sets to contain at least 2 different rules - otherwise we end up with only a single blocking rule
+    potential_rules = []
+    for r in range(2, len(blocking_rules)+1):
       for c in itertools.combinations(blocking_rules, r):
-        if sum([v for k, v in comp_size_dict.items() if k in c])<=comparison_size_limit:
-          accepted_rules.append(list(c))
+        rule_size = sum([v for k, v in comp_size_dict.items() if k in c])
+        accepted_rules.append(list(c, rule_size))
+
+    # take the bottom 4 rules by size if no comparison size is returned
+    if not comparison_size_limit:
+      potential_rules.sort(key=lambda x: x[-1])
+      accepted_rules = potential_rules[:4]
+      accepted_rules = [_[0] for _ in accepted_rules]
+      
+    else:
+      # loop through all combinations of combinations and save those which remain under the limit (this is a bit brute force)
+      accepted_rules = []
+      for rule in potential_rules:
+        if rule[1]<=comparison_size_limit:
+          accepted_rules.append(rule[0])
 
 
     if len(accepted_rules)<1:
@@ -357,9 +370,8 @@ class AutoLinker:
 
   def deduplicate_records(self, data, predictions, linker, attribute_columns, unique_id, threshold=0.9):
     """
-    Method to deduplicate the original dataset given the predictions dataframe, its linker
-    object and an optional threshold. The clusters are grouped on and duplicates are removed (arbitrarily).
-    These are then replaced in the original dataset.
+    Method to deduplicate values within the original dataset given the predictions dataframe, its linker
+    object and an optional threshold. Cluster values are standardised to a single value.
     Parameters
     : data : Spark Dataframe of the original data set
     : predictions : Splink Dataframe that's a result of a linker.predict() call
@@ -371,26 +383,20 @@ class AutoLinker:
     
     # Cluster records that are matched above threshold
     clusters = linker.cluster_pairwise_predictions_at_threshold(predictions, threshold_match_probability=threshold)
-    df_predictions = clusters.as_spark_dataframe().select(unique_id, "cluster_id")
-
-    # Get max cluster id to use as lower bound of monotonically increasing id
-    max_cluster_id = df_predictions.select(F.max("cluster_id")).collect()[0]["max(cluster_id)"] + 1
-    
-    # Assign monotonically increasing id greater than max cluster_id
-    data = data.withColumn("tmp_cluster_id", F.monotonically_increasing_id()+max_cluster_id)
-    
-    # Left join predictions onto input data
-    data = data.join(df_predictions, on=unique_id, how="left")
-    
-    # Coalesce
-    data = data.withColumn("cluster_id", F.coalesce(F.col("cluster_id"), F.col("tmp_cluster_id")))
-    
-    # Group by cluster ID
-    df_deduped = data.groupBy("cluster_id").agg(
-      *(F.first(i).alias(i) for i in attribute_columns)
-    )
-
-    return df_deduped
+    # define window to aggregate over
+    window = Window.partitionBy("cluster_id")
+    df_predictions = clusters.as_spark_dataframe()
+    # loop through the attributes and standardise. we want to keep original column names.
+    for attribute_column in attribute_columns:
+      new_col_name = f"std_{attribute_column}"
+      df_predictions = (
+        df_predictions
+        .withColumn(new_col_name, F.first(F.col(attribute_column)).over(window)) # standardise values
+        .drop(F.col(attribute_column)) # drop origina values
+        .withColumnRenamed(new_col_name, attribute_column) # replace with standardised values
+      )
+      
+    return df_predictions
 
   
 
