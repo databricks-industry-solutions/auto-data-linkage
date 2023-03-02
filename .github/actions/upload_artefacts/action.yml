@@ -7,4 +7,4 @@ runs:
       uses: actions/upload-artifact@v3
       with:
         name: artefacts
-        path: staging
+        path: staging/databricks_arc.whl
