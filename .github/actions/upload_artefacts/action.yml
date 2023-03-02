@@ -23,9 +23,4 @@ runs:
         with:
           name: o3
           path: ./staging
-    - name: upload pm10 artefacts
-        uses: actions/upload-artifact@v3
-        with:
-          name: pm10
-          path: **/*.whl
 
