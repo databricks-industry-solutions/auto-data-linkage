@@ -7,20 +7,4 @@ runs:
       uses: actions/upload-artifact@v3
       with:
         name: artefacts
-        path: staging/*
-    - name: upload no2 artefacts
-      uses: actions/upload-artifact@v3
-      with:
-        name: no2
         path: staging
-    - name: upload so2 artefacts
-        uses: actions/upload-artifact@v3
-        with:
-          name: so2
-          path: ./staging/*
-    - name: upload o3 artefacts
-        uses: actions/upload-artifact@v3
-        with:
-          name: o3
-          path: ./staging
-
