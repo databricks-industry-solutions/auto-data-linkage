@@ -12,8 +12,8 @@
 #
 import os
 import sys
-sys.path.insert(0, os.path.abspath('../../python'))
 
+sys.path.insert(0, os.path.abspath('../../python'))
 
 # -- Project information -----------------------------------------------------
 
@@ -23,7 +23,6 @@ author = 'Robert Whiffin, Marcell Ferencz, Milos Colic, Databricks Inc'
 
 # The full version, including alpha/beta/rc tags
 release = "v0.0.1"
-
 
 # -- General configuration ---------------------------------------------------
 
@@ -76,22 +75,22 @@ html_theme_options = {
     'color_accent': 'green',
 
     # Set the repo location to get a badge with stats
-    'repo_url': 'https://github.com/databrickslabs/mosaic/',
+    'repo_url': 'https://github.com/databricks-industry-solutions/splink-public-sector-hackathon',
     'repo_name': 'ARC',
 
     'globaltoc_depth': 3,
     'globaltoc_collapse': False,
-    'globaltoc_includehidden': True,    
-    'heroes': {'index': 'Simple, scalable geospatial analytics on Databricks',
+    'globaltoc_includehidden': True,
+    'heroes': {'index': 'Simple, automated and unsupervised data linking solution on Databricks.',
                'examples/index': 'examples and tutorials to get started with '
-                                 'Mosaic'},
+                                 'ARC'},
     "version_dropdown": True,
     # "version_json": "../versions-v2.json",
 
 }
 html_title = project
 html_short_title = project
-html_logo = 'images/mosaic_logo.svg'
+# html_logo = 'images/logo.svg'
 html_sidebars = {
     "**": ["logo-text.html", "globaltoc.html", "localtoc.html", "searchbox.html"]
 }
