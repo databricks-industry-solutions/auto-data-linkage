@@ -12,7 +12,7 @@ jobs:
       run: sudo apt-get install pandoc
     - uses: actions/setup-python@v2
       with:
-        python-version: '3.7'
+        python-version: '3.9'
     - uses: actions/checkout@v2
       with:
         ref: testing_docs # TODO: change back to main
