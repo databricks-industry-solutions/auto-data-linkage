@@ -13,8 +13,7 @@
 import os
 import sys
 
-sys.path.insert(0, os.path.abspath('../../python'))
-
+sys.path.insert(0, os.path.abspath('../../arc'))
 # -- Project information -----------------------------------------------------
 
 project = 'ARC'
@@ -35,11 +34,14 @@ extensions = [
     "sphinx_tabs.tabs",
     "sphinx.ext.githubpages",
     "sphinx.ext.autosectionlabel",
-    "sphinx.ext.todo"
+    "sphinx.ext.todo",
+    "sphinx.ext.autodoc"
 ]
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
+
+autodoc_typehints = "description"
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.

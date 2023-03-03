@@ -3,6 +3,7 @@ on:
   push:
     branches:
     - main
+    - testing_docs
 jobs:
   build:
     runs-on: ubuntu-latest
