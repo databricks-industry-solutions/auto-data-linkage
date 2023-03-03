@@ -1,7 +1,10 @@
 from pyspark.sql import functions as F
 from pyspark.sql.types import *
+import pyspark
+
 from dbruntime.display import displayHTML
 
+import splink
 from splink.spark.spark_linker import SparkLinker
 from splink.databricks.enable_splink import enable_splink
 import splink.spark.spark_comparison_library as cl
@@ -18,6 +21,8 @@ import math
 import random
 from datetime import datetime
 
+import typing
+
 import mlflow
 
 
@@ -27,6 +32,8 @@ class AutoLinker:
   
   Basic usage:
   
+  .. code-block:: python
+
   >>> arc = AutoLinker(
   ...   catalog="splink_catalog",                # catalog name
   ...   schema="splink_schema",                  # schema to write results to
@@ -44,8 +51,26 @@ class AutoLinker:
   """
   
   
-  def __init__(self, spark=None, catalog=None, schema=None, experiment_name=None, training_columns=None, deterministic_columns=None):
+  def __init__(
+    self,
+    spark:str=None,
+    catalog:str=None,
+    schema:str=None,
+    experiment_name:str=None,
+    training_columns:list=None,
+    deterministic_columns:list=None
+  ) -> None:
+    """
+    Initialises an AutoLinker instance to perform automated record linking.
 
+    :param spark: Spark instance used
+    :param catalog: Unity Catalog name, if used, for intermediate tables
+    :param schema: Schema/database name for intermediate tables
+    :param experiment_name: Location or simply name of the MLflow experiment for storing trial run results
+    :param training_columns: Valid list of columns (or column names separated by '&' for AND combinations) of columns to be fixed during EM training
+    :param deterministic_columns: Valid list of columns (or column names separated by '&' for AND combinations) of columns to be used for prior estimation
+
+    """
     self.spark = spark 
     self.catalog = catalog# if catalog else spark.catalog.currentCatalog()
     self.schema = schema  #. if schema else spark.catalog.currentDatabase()
@@ -60,20 +85,23 @@ class AutoLinker:
     
 
   def __str__(self):
-    return f"AutoLinker instance working in {self.catalog}.{self.schema} and MLflow experiment {experiment_name}"
+    return f"AutoLinker instance working in {self.catalog}.{self.schema} and MLflow experiment {self.experiment_name}"
   
   
   
-  def _calculate_column_entropy(self, data, column):
+  def _calculate_column_entropy(
+    self,
+    data:pyspark.sql.DataFrame,
+    column:str
+  ) -> float:
     """
     Method to calculate column entropy given a dataset, based on:
-    Entropy = -SUM(P*ln(P))
-    where P is the normalised count of the occurrence of each unique value in the column
-    Parameters
-    : data : Spark Dataframe
-    : column : name of column to calculate
-    Returns
-      - Float
+    :math:`Entropy = -SUM(P*ln(P))`
+    where P is the normalised count of the occurrence of each unique value in the column.
+    
+    :param data: input dataframe with row per record
+    :param column: (valid) name of column to calculate entropy on
+
     """
     
     # calculate normalised value count per unique value in colunn
@@ -91,14 +119,18 @@ class AutoLinker:
   
   
     
-  def _generate_rules(self, columns):
+  def _generate_rules(
+    self,
+    columns:list
+  ) -> list:
     """
     Method to create a list of Splink-compatible SQL statements from a list of candidate columns for rules.
-    Can be used for simple blocking rules (no AND statement), deterministic rules or for training rules
-    Parameters
-    : columns : list of str containing valid columns in the data set
-    Returns
-      - List of strings of Splink-compatible SQL statements
+    Can be used for simple blocking rules (no AND statement), deterministic rules or for training rules.
+    
+    Returns list of strings of Splink-compatible SQL statements.
+
+    :param columns: valid attribute columns in the data set
+
     """
 
     rules = []
@@ -117,17 +149,26 @@ class AutoLinker:
   
   
   
-  def _generate_candidate_blocking_rules(self, data, attribute_columns, comparison_size_limit, unique_id, max_columns_per_rule=2):
+  def _generate_candidate_blocking_rules(
+    self,
+    data:pyspark.sql.DataFrame,
+    attribute_columns:list,
+    comparison_size_limit:int,
+    unique_id:str,
+    max_columns_per_rule:int=2
+  ) -> list:
     """
     Method to automatically generate a list of lists of blocking rules to test, given a user-defined limit for
     pair-wise comparison size.
-    Parameters
-    : data : Spark DataFrame containing all records to de-duplicate
-    : attribute_columns : list of strings with valid column names of data, containing all possible columns to block on
-    : comparison_size_limit : integer denoting the maximum number of pairs we want to compare - to limit hardware issues
-    : max_columns_per_rule : integer denoting the maximum number of column comparisons in a single rule to try
-    Returns
-      - nested list of lists with Splink-compatible blocking rule queries
+
+    Returns a nested list of lists with Splink-compatible blocking rule queries.
+
+    :param data: input data with record-per-row
+    :param attribute_columns: valid column names of data, containing all possible columns to block on
+    :param comparison_size_limit: the maximum number of pairs we want to compare, to limit hardware issues
+    :param unique_id: the name of the unique ID column in data
+    :param max_columns_per_rule: the maximum number of column comparisons in a single rule to try
+
     """
 
     # initialise empty list to store all combinations in
@@ -163,18 +204,26 @@ class AutoLinker:
 
   
   
-  def _create_hyperopt_space(self, data, attribute_columns, comparison_size_limit, unique_id, max_columns_per_rule=2):
+  def _create_hyperopt_space(
+    self,
+    data:pyspark.sql.DataFrame,
+    attribute_columns:list,
+    comparison_size_limit:int,
+    unique_id:str,
+    max_columns_per_rule:int=2
+  ) -> dict:
     """
     Method to create hyperopt space for comparison and blocking rule hyperparameters from list of columns.
     Takes a given (or generated) list of columns and produces a dictionary that can be converted to a comparison list later on,
     with function names and threhsolds, and a list (of lists) of blocking rules to test.
-    Parameters
-    : data : Spark DataFrame containing all records to de-duplicate
-    : attribute_columns : list of strings with valid column names of data, containing all possible columns to block on or compare
-    : comparison_size_limit : integer denoting the maximum number of pairs we want to compare - to limit hardware issues
-    : max_columns_per_rule : integer denoting the maximum number of column comparisons in a single rule to try
-    Returns
-      - hyperopt.pyll graph for hyperopt parameter search
+
+    Returns a dictionary for hyperopt parameter search
+
+    :param data: input data with records per row
+    :param attribute_columns: valid column names of data, containing all possible columns to compare
+    :param comparison_size_limit: maximum number of pairs we want to compare, to limit hardware issues
+    :param max_columns_per_rule: the maximum number of column comparisons in a single rule to try
+    
     """
 
     # Generate candidate blocking rules
@@ -217,6 +266,9 @@ class AutoLinker:
   
   
   def _drop_intermediate_tables(self):
+    """
+    Method to drop intermediate tables for clean consecutive runs.
+    """
     # Drop intermediate tables in schema for consecutive runs
     tables_in_schema = self.spark.sql(f"show tables from {self.catalog}.{self.schema} like '*__splink__*'").collect()
     for table in tables_in_schema:
@@ -226,19 +278,24 @@ class AutoLinker:
         self.spark.sql(f"drop table {table.tableName}")
         
   
-  def _clean_columns(self, data, attribute_columns, cleaning):
+  def _clean_columns(
+    self,
+    data:pyspark.sql.DataFrame,
+    attribute_columns:list,
+    cleaning="all"):
     """
     Method to clean string columns (turn them to lower case and remove non-alphanumeric characters)
-    in order to help with better (and quicker) string-distance calculations. If cleaning is "all"
-    (as is by default), it will automatically clean as much as it can.  If cleaning is "none", it will do nothing.
+    in order to help with better (and quicker) string-distance calculations. If cleaning is 'all'
+    (as is by default), it will automatically clean as much as it can.  If cleaning is 'none', it will do nothing.
     cleaning can also be a dictionary with keys as column names and values as lists of method strings.
     The currently available cleaning methods are turning to lower case and removing non-alphanumeric characters.
-    Parameters
-    : data : Spark DataFrame containing the data to be cleaned
-    : attribute_columns : list of strings containing all attribute columns
-    : cleaning : string or dicitonary with keys as column names and values as list of valid cleaning method names.
-    Returns
-      - Spark dataframe
+
+    Returns a Spark DataFrame.
+
+    :param data: DataFrame containing the data to be cleaned
+    :param attribute_columns: all attribute columns
+    :param cleaning: string or dicitonary with keys as column names and values as list of valid cleaning method names.
+
     """
     
     # if cleaning is set to "none", don't do anything to the data
@@ -266,13 +323,14 @@ class AutoLinker:
   
 
 
-  def _convert_hyperopt_to_splink(self):
+  def _convert_hyperopt_to_splink(self) -> dict:
     """
     Method to convert hyperopt trials to a dictionary that can be used to
     train a linker model. Used for training the best linker model at the end of an experiment.
-    Sets class attributes for best metric and parameters as well
-    Returns
-      - dictionary
+    Sets class attributes for best metric and parameters as well.
+
+    Returns a dictionary.
+
     """
     # Set best params, metrics and results
     t = self.trials.best_trial
@@ -311,14 +369,18 @@ class AutoLinker:
 
 
     
-  def _create_comparison_list(self, space):
+  def _create_comparison_list(
+    self,
+    space:dict
+  ) -> list:
     """
     Method to convert comparisons dictionary generated by hyperopt to a Splink-compatible list of
     spark_comparison_library functions with the generated columns and thresholds.
-    Parameters
-    : comparison_dict : nested dicitonary generated by create_comparison_dict
-    Returns
-      - List of spark_comparison_library method instances
+
+    Returns list of spark_comparison_library method instances.
+
+    :param space: nested dicitonary generated by create_comparison_dict
+
     """
 
     # Initialise empty list to populate
@@ -345,18 +407,27 @@ class AutoLinker:
   
   
 
-  def deduplicate_records(self, data, predictions, linker, attribute_columns, unique_id, threshold=0.9):
+  def deduplicate_records(
+    self,
+    data:pyspark.sql.DataFrame,
+    predictions:splink.splink_dataframe.SplinkDataFrame,
+    linker:splink.spark.spark_linker.SparkLinker,
+    attribute_columns:list,
+    unique_id:str,
+    threshold:float=0.9
+  ) -> pyspark.sql.DataFrame:
     """
     Method to deduplicate the original dataset given the predictions dataframe, its linker
     object and an optional threshold. The clusters are grouped on and duplicates are removed (arbitrarily).
     These are then replaced in the original dataset.
-    Parameters
-    : data : Spark Dataframe of the original data set
-    : predictions : Splink Dataframe that's a result of a linker.predict() call
-    : linker : the linker object (splink.SparkLinker instance), needed to cluster
-    : threshold : Float denoting the probability threshold above which a pair is considered a match
-    Returns
-      - Spark Dataframe with deduplicated records
+    
+    Returns a spark Dataframe with deduplicated records.
+
+    :param data: original data set
+    :param predictions: Splink Dataframe that's a result of a linker.predict() call
+    :param linker: a trained linker object, needed to cluster
+    :param threshold: the probability threshold above which a pair is considered a match
+    
     """
     
     # Cluster records that are matched above threshold
@@ -384,26 +455,36 @@ class AutoLinker:
 
   
 
-  def calculate_entropy_delta(self, data, deduped, columns):
+  def calculate_entropy_delta(
+    self,
+    deduped:pyspark.sql.DataFrame
+  ) -> float:
     """
     Method to calculate the change in entropy of a set of columns between two
     datasets, used to calculate the information gain after deduping a set of records.
-    Parameters
-    : data : Spark DataFrame, the original (undeduplicated) data set of records
-    : deduped : Spark DataFrame, the new (deduplicated) data set of records
-    : columns : list of strings with valid column names to compare
-    Returns
-      - Float (average change in column entropy)
+    
+    Returns average change in column entropy.
+
+    :param data: the original (undeduplicated) data set of records
+    :param deduped: the new (deduplicated) data set of records
+    :param columns: valid column names to compare
+    
     """
+    
     
     # Initialise empty list to populate with entropy deltas
     entropy_deltas = list()
+    dd_cnt=deduped.count()
+    columns = self.attribute_columns
+    if self.original_entropies == dict():
+      for column in columns:
+        self.original_entropies[column] = self._calculate_column_entropy(self.data, column, self.data_rowcount)
     
     # For each column in given columns, calculate entropy in original dataset
     # and the deduplicated dataset. The delta is the difference between new and old.
     for column in columns:
-      original_entropy = self._calculate_column_entropy(data, column)
-      new_entropy = self._calculate_column_entropy(deduped, column)
+      original_entropy = self.original_entropies[column]
+      new_entropy = self._calculate_column_entropy(deduped, column, dd_cnt)
       entropy_deltas.append(new_entropy-original_entropy)
 
 
@@ -411,14 +492,18 @@ class AutoLinker:
   
   
   
-  def _randomise_columns(self, attribute_columns):
+  def _randomise_columns(
+    self,
+    attribute_columns:list
+  ) -> list:
     """
     Method to randomly select (combinations of) columns from attribute columns for EM training.
     Will try to pick 2 combinations of 2 (i.e AB and BC from ABC), but will default to 2 if there are only 2.
-    Parameters
-    : attribute_columns : list of strings containing all attribute columns
-    Returns
-      - List of lists of strings
+
+    Returns list of lists of strings.
+
+    :param attribute_columns: list of strings containing all attribute columns
+    
     """
     # if there are only 2 columns, return them both
     if len(attribute_columns)<3:
@@ -434,18 +519,27 @@ class AutoLinker:
     return training_columns
   
 
-  def train_linker(self, data, space, attribute_columns, unique_id, deterministic_columns=None, training_columns=None):
+  def train_linker(
+    self,
+    data:pyspark.sql.DataFrame,
+    space:dict,
+    attribute_columns:list,
+    unique_id:str,
+    deterministic_columns:list=None,
+    training_columns:list=None
+    ) -> typing.Tuple[splink.spark.spark_linker.SparkLinker, splink.splink_dataframe.SplinkDataFrame]:
     """
-    Method to train a linker model
-    Parameters
-    : data : Spark DataFrame containing the data to be de-duplicated
-    : space : dictionary generated by hyperopt sampling
-    : attribute_columns : list of strings containing all attribute columns
-    : unique_id : string with the name of the unique ID column
-    : deterministic columns : list of strings containint columns to block on
-    : training_columns : list of strings containing training columns
-    Returns
-      - tuple of trained linker object and Splink dataframe with predictions
+    Method to train a linker model.
+
+    Returns a 2-tuple of trained linker object and Splink dataframe with predictions
+
+    :param data: Spark DataFrame containing the data to be de-duplicated
+    :param space: dictionary generated by hyperopt sampling
+    :param attribute_columns: list of strings containing all attribute columns
+    :param unique_id: string with the name of the unique ID column
+    :param deterministic columns: list of strings containint columns to block on
+    :param training_columns: list of strings containing training columns
+    
     """
 
 
@@ -503,17 +597,26 @@ class AutoLinker:
   
   
   
-  def evaluate_linker(self, data, predictions, threshold, attribute_columns, unique_id, linker):
+  def evaluate_linker(
+    self,
+    data:pyspark.sql.DataFrame,
+    predictions:splink.splink_dataframe.SplinkDataFrame,
+    threshold:float,
+    attribute_columns:list,
+    unique_id:str,
+    linker:splink.spark.spark_linker.SparkLinker
+    ) -> dict:
     """
-    Method to evaluate predictions made by a trained linker model
-    Parameters
-    : data : Spark Dataframe containing the original dataset (required to establish ground truth labels)
-    : df_predictions : Spark DataFrame containing pair-wise predictions made by a linker model
-    : threshold : float indicating the probability threshold above which a pair is considered a match
-    : attribute_columns : list of strings with valid column names to compare the entropies of
-    : linker : isntance of splink.SparkLinker, used for deduplication (clustering)
-    Returns
-      - Dictionary of evaluation metrics TODO: make the metrics controllable via an argument
+    Method to evaluate predictions made by a trained linker model.
+
+    Returns a dictionary of evaluation metrics.
+
+    :param data: Spark Dataframe containing the original dataset (required to establish ground truth labels)
+    :param df_predictions: Spark DataFrame containing pair-wise predictions made by a linker model
+    :param threshold: float indicating the probability threshold above which a pair is considered a match
+    :param attribute_columns: list of strings with valid column names to compare the entropies of
+    :param linker: isntance of splink.SparkLinker, used for deduplication (clustering)
+    
     """
 
     
@@ -531,7 +634,22 @@ class AutoLinker:
   
   
   
-  def train_and_evaluate_linker(self, data, space, attribute_columns, unique_id, deterministic_columns=None, training_columns=None, threshold=0.9):
+  def train_and_evaluate_linker(
+    self,
+    data:pyspark.sql.DataFrame,
+    space:dict,
+    attribute_columns:list,
+    unique_id:str,
+    deterministic_columns:list=None,
+    training_columns:list=None,
+    threshold:float=0.9
+    ) -> typing.Tuple[
+      splink.spark.spark_linker.SparkLinker,
+      splink.splink_dataframe.SplinkDataFrame,
+      dict,
+      dict,
+      str
+    ]:
     """
     Method to train and evaluate a linker model in one go
     Parameters
