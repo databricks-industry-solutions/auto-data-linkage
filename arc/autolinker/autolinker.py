@@ -40,7 +40,7 @@ class AutoLinker:
   Basic usage:
   
   .. code-block:: python
-  
+
   >>> arc = AutoLinker(
   ...   catalog="splink_catalog",                # catalog name
   ...   schema="splink_schema",                  # schema to write results to
@@ -90,8 +90,8 @@ class AutoLinker:
   
   def _calculate_column_entropy(
     self,
-    data:pyspark.sql.DataFrame,
-    column:str
+    data: pyspark.sql.DataFrame,
+    column: str
   ) -> float:
     """
     Method to calculate column entropy given a dataset, based on:

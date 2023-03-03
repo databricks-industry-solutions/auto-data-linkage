@@ -7,3 +7,7 @@ sphinxcontrib-fulltoc==1.2.0
 livereload==2.6.3
 autodocsumm==0.2.7
 sphinx-tabs==3.2.0
+mlflow==2.2.1
+hyperopt==0.2.7
+pyspark==3.3.2
+splink==3.6.0
