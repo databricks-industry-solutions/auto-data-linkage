@@ -61,13 +61,17 @@ class AutoLinker:
     self.clusters=None
     self.cluster_threshold=None
     self.df_true_positives=None
+    self.original_entropies = dict()
+    self.data_rowcount = None
+    self.data=None
+    self.attribute_columns=None
 
   def __str__(self):
     return f"AutoLinker instance working in {self.catalog}.{self.schema} and MLflow experiment {experiment_name}"
   
   
   
-  def _calculate_column_entropy(self, data, column):
+  def _calculate_column_entropy(self, data, column, count):
     """
     Method to calculate column entropy given a dataset, based on:
     Entropy = -SUM(P*ln(P))
@@ -81,7 +85,8 @@ class AutoLinker:
     
     # calculate normalised value count per unique value in colunn
     # will always be between 0 and 1
-    vc = data.groupBy(column).count().withColumn("norm_count", F.col("count")/self.data_rowcount)
+    #vc = data.groupBy(column).count().withColumn("norm_count", F.col("count")/self.data_rowcount)
+    vc = data.groupBy(column).count().withColumn("norm_count", F.col("count")/count)
 
     
     # Calculate P*ln(P) per row. Milos idea: e^P+ln(ln(P)) 
@@ -122,8 +127,7 @@ class AutoLinker:
       rules.append(rule)
 
     return rules
-  
-  
+    
   
   def _generate_candidate_blocking_rules(self, data, attribute_columns, comparison_size_limit, unique_id, max_columns_per_rule=2):
     """
@@ -185,7 +189,6 @@ class AutoLinker:
     return accepted_rules
 
   
-  
   def _create_hyperopt_space(self, data, attribute_columns, comparison_size_limit, unique_id, max_columns_per_rule=2):
     """
     Method to create hyperopt space for comparison and blocking rule hyperparameters from list of columns.
@@ -236,9 +239,8 @@ class AutoLinker:
     })
 
     return space
-  
-  
-  
+   
+ 
   def _drop_intermediate_tables(self):
     # Drop intermediate tables in schema for consecutive runs
     tables_in_schema = self.spark.sql(f"show tables from {self.catalog}.{self.schema} like '*__splink__*'").collect()
@@ -288,7 +290,6 @@ class AutoLinker:
     return data
   
 
-
   def _convert_hyperopt_to_splink(self):
     """
     Method to convert hyperopt trials to a dictionary that can be used to
@@ -332,7 +333,6 @@ class AutoLinker:
 
     return best_params_for_rt
 
-
     
   def _create_comparison_list(self, space):
     """
@@ -367,8 +367,7 @@ class AutoLinker:
     return comparison_list
   
   
-
-  def deduplicate_records(self, data, predictions, linker, attribute_columns, unique_id, threshold=0.9):
+  def deduplicate_records2(self, data, predictions, linker, attribute_columns, unique_id, threshold=0.9):
     """
     Method to deduplicate values within the original dataset given the predictions dataframe, its linker
     object and an optional threshold. Cluster values are standardised to a single value.
@@ -397,10 +396,38 @@ class AutoLinker:
       )
       
     return df_predictions
+  
+
+  def deduplicate_records(self, data, predictions, linker, attribute_columns, unique_id, threshold=0.9):
+    """
+    Method to deduplicate the original dataset given the predictions dataframe, its linker
+    object and an optional threshold. The clusters are grouped on and duplicates are removed (arbitrarily).
+    These are then replaced in the original dataset.
+    Parameters
+    : data : Spark Dataframe of the original data set
+    : predictions : Splink Dataframe that's a result of a linker.predict() call
+    : linker : the linker object (splink.SparkLinker instance), needed to cluster
+    : threshold : Float denoting the probability threshold above which a pair is considered a match
+    Returns
+      - Spark Dataframe with deduplicated records
+    """
+    
+    # Cluster records that are matched above threshold
+    # Cluster records that are matched above threshold
+    clusters = linker.cluster_pairwise_predictions_at_threshold(predictions, threshold_match_probability=threshold)
+    df_predictions = clusters.as_spark_dataframe()
+
+    
+    # Deduplicate predictions by grouping on cluster_id
+    df_deduped_preds = df_predictions.groupBy("cluster_id").agg(
+      *(F.first(i).alias(i) for i in attribute_columns)
+    )
+
+    return df_deduped_preds
 
   
 
-  def calculate_entropy_delta(self, data, deduped, columns):
+  def calculate_entropy_delta(self, deduped):
     """
     Method to calculate the change in entropy of a set of columns between two
     datasets, used to calculate the information gain after deduping a set of records.
@@ -414,12 +441,17 @@ class AutoLinker:
     
     # Initialise empty list to populate with entropy deltas
     entropy_deltas = list()
+    dd_cnt=deduped.count()
+    columns = self.attribute_columns
+    if self.original_entropies == dict():
+      for column in columns:
+        self.original_entropies[column] = self._calculate_column_entropy(self.data, column, self.data_rowcount)
     
     # For each column in given columns, calculate entropy in original dataset
     # and the deduplicated dataset. The delta is the difference between new and old.
     for column in columns:
-      original_entropy = self._calculate_column_entropy(data, column)
-      new_entropy = self._calculate_column_entropy(deduped, column)
+      original_entropy = self.original_entropies[column]
+      new_entropy = self._calculate_column_entropy(deduped, column, dd_cnt)
       entropy_deltas.append(new_entropy-original_entropy)
 
 
@@ -537,10 +569,10 @@ class AutoLinker:
     deduped = self.deduplicate_records(data, predictions, linker, attribute_columns, unique_id, threshold)
     
     # Calculate mean change in entropy
-    mean_entropy_change = self.calculate_entropy_delta(data, deduped, attribute_columns)
+    mean_entropy_change = self.calculate_entropy_delta(deduped)
     
     evals = {
-      "mean_entropy_change": mean_entropy_change
+      "mean_entropy_change": mean_entropy_change,
     }
 
     return evals
@@ -652,6 +684,8 @@ class AutoLinker:
 
     # Count rows in data - doing this here so we only do it once
     self.data_rowcount = data.count()
+    self.data=data
+    self.attribute_columns=attribute_columns
     
     # Clean the data
     data = self._clean_columns(data, attribute_columns, cleaning)
@@ -906,7 +940,7 @@ class AutoLinker:
     if tp+fp>0.0:
       precision = tp/(tp+fp)
     else:
-      precision: 0.9
+      precision: 0.0 # was 0.9
       
     if tp+fn>0.0:
       recall = tp/(tp+fn)

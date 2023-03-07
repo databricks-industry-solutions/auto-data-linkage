@@ -30,7 +30,7 @@ voter_data.display()
 # DBTITLE 1,Create new linker object
 autolinker = AutoLinker(
   catalog = "robert_whiffin_uc", schema="autosplink" # optional arguments to determine where internal tables are stored
-  , experiment_name="/Users/robert.whiffin@databricks.com/voter_data_benchmark_photon_updated_dedupe_rules_and_loss"
+  , experiment_name="/Users/robert.whiffin@databricks.com/voter_data_benchmark_photon_updated_loss_groupby_dedupe"
 )
 
 # COMMAND ----------
@@ -40,7 +40,7 @@ autolinker.auto_link(
   data=voter_data,                                                             # dataset to dedupe
   attribute_columns=["givenname", "surname", "suburb", "postcode"],      # columns that contain attributes to compare
   unique_id="uid",                                                       # column name of the unique ID
-  max_evals=5,                                                            # Maximum number of trials to run
+  max_evals=50,                                                            # Maximum number of trials to run
   true_id="recid"
 )
 
@@ -52,14 +52,11 @@ display(
 
 # COMMAND ----------
 
-import pyspark.sql.functions as F
-from pyspark.sql import Window
+(autolinker.best_predictions().count(), voter_data.count())
 
-display(
-  autolinker.best_clusters_at_threshold()# default=0.8
-  .withColumn("size", F.count("*").over(Window.partitionBy("cluster_id")))
-  .orderBy(-F.col("size"))
-)
+# COMMAND ----------
+
+autolinker.best_clusters_at_threshold().count() == voter_data.count()
 
 # COMMAND ----------
 
