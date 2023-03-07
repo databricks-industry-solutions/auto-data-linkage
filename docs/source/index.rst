@@ -14,6 +14,7 @@ Documentation
    :maxdepth: 2
    :caption: Contents:
 
+
 AutoLinker
 ----------
 .. autoclass:: autolinker.autolinker.AutoLinker
@@ -58,7 +59,6 @@ Utility functions
 
 .. autofunction:: autolinker.splink_mlflow.get_model_json
 
-   
 
 
 Indices and tables

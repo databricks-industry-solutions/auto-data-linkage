@@ -3,7 +3,6 @@ on:
   push:
     branches:
     - main
-    - testing_docs
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -15,7 +14,7 @@ jobs:
         python-version: '3.9'
     - uses: actions/checkout@v2
       with:
-        ref: testing_docs # TODO: change back to main
+        ref: main
         fetch-depth: 0 # otherwise, you will failed to push refs to dest repo
     - name: Build and Commit
       uses: sphinx-notes/pages@v2
