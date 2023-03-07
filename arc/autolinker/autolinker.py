@@ -1,5 +1,6 @@
 from pyspark.sql import functions as F
 from pyspark.sql.types import *
+from pyspark.sql import Window
 import pyspark
 
 # from dbruntime.display import displayHTML
@@ -81,6 +82,7 @@ class AutoLinker:
     self.best_params = None
     self.clusters=None
     self.cluster_threshold=None
+    self.original_entropies = dict()
     
 
   def __str__(self):
@@ -103,8 +105,9 @@ class AutoLinker:
 
     """
     
-    # calculate normalised value count per unique value in colunn
-    vc = data.groupBy(column).count().withColumn("norm_count", F.col("count")/self.data_rowcount)
+    # calculate normalised value count per unique value in column
+    rowcount = data.count()
+    vc = data.groupBy(column).count().withColumn("norm_count", F.col("count")/rowcount)
 
     
     # Calculate P*ln(P) per row
@@ -408,49 +411,38 @@ class AutoLinker:
 
   def deduplicate_records(
     self,
-    data:pyspark.sql.DataFrame,
     predictions:splink.splink_dataframe.SplinkDataFrame,
     linker:splink.spark.spark_linker.SparkLinker,
     attribute_columns:list,
-    unique_id:str,
     threshold:float=0.9
   ) -> pyspark.sql.DataFrame:
     """
     Method to deduplicate the original dataset given the predictions dataframe, its linker
-    object and an optional threshold. The clusters are grouped on and duplicates are removed (arbitrarily).
+    object and an optional threshold. The clusters are grouped on and duplicates are set to the same value (arbitrarily).
     These are then replaced in the original dataset.
     
     Returns a spark Dataframe with deduplicated records.
 
-    :param data: original data set
     :param predictions: Splink Dataframe that's a result of a linker.predict() call
     :param linker: a trained linker object, needed to cluster
+    :param attribute_columns: list of column names containing attribtues in the data
     :param threshold: the probability threshold above which a pair is considered a match
     
     """
     
     # Cluster records that are matched above threshold
     clusters = linker.cluster_pairwise_predictions_at_threshold(predictions, threshold_match_probability=threshold)
-    df_predictions = clusters.as_spark_dataframe().select(unique_id, "cluster_id")
+    # define window to aggregate over
+    window = Window.partitionBy("cluster_id")
+    df_predictions = clusters.as_spark_dataframe()
+    # loop through the attributes and standardise. we want to keep original column names.
+    for attribute_column in attribute_columns:
+      df_predictions = (
+        df_predictions
+        .withColumn(attribute_column, F.first(F.col(attribute_column)).over(window)) # standardise values
+      )
 
-    # Get max cluster id to use as lower bound of monotonically increasing id
-    max_cluster_id = df_predictions.select(F.max("cluster_id")).collect()[0]["max(cluster_id)"] + 1
-    
-    # Assign monotonically increasing id greater than max cluster_id
-    data = data.withColumn("tmp_cluster_id", F.monotonically_increasing_id()+max_cluster_id)
-    
-    # Left join predictions onto input data
-    data = data.join(df_predictions, on=unique_id, how="left")
-    
-    # Coalesce
-    data = data.withColumn("cluster_id", F.coalesce(F.col("cluster_id"), F.col("tmp_cluster_id")))
-    
-    # Group by cluster ID
-    df_deduped = data.groupBy("cluster_id").agg(
-      *(F.first(i).alias(i) for i in attribute_columns)
-    )
-
-    return df_deduped
+    return df_predictions
 
   
 
