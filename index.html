@@ -540,20 +540,18 @@ See this video for an indepth explanation of interpreting this dashboard: <a cla
 </dd></dl>
 <dl class="py method">
 <dt class="sig sig-object py" id="autolinker.autolinker.AutoLinker.deduplicate_records">
-<span class="sig-name descname"><span class="pre">deduplicate_records</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">predictions</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">linker</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attribute_columns</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">unique_id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">threshold</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.9</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#autolinker.autolinker.AutoLinker.deduplicate_records" title="Permalink to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">deduplicate_records</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">predictions</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">linker</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attribute_columns</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">threshold</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.9</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#autolinker.autolinker.AutoLinker.deduplicate_records" title="Permalink to this definition">¶</a></dt>
 <dd><p>Method to deduplicate the original dataset given the predictions dataframe, its linker
-object and an optional threshold. The clusters are grouped on and duplicates are removed (arbitrarily).
+object and an optional threshold. The clusters are grouped on and duplicates are set to the same value (arbitrarily).
 These are then replaced in the original dataset.</p>
 <p>Returns a spark Dataframe with deduplicated records.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>data</strong> (<em>pyspark.sql.dataframe.DataFrame</em>) – original data set</p></li>
 <li><p><strong>predictions</strong> (<em>splink.splink_dataframe.SplinkDataFrame</em>) – Splink Dataframe that’s a result of a linker.predict() call</p></li>
 <li><p><strong>linker</strong> (<em>splink.spark.spark_linker.SparkLinker</em>) – a trained linker object, needed to cluster</p></li>
+<li><p><strong>attribute_columns</strong> (<em>list</em>) – list of column names containing attribtues in the data</p></li>
 <li><p><strong>threshold</strong> (<em>float</em>) – the probability threshold above which a pair is considered a match</p></li>
-<li><p><strong>attribute_columns</strong> (<em>list</em>) – </p></li>
-<li><p><strong>unique_id</strong> (<em>str</em>) – </p></li>
 </ul>
 </dd>
 <dt class="field-even">Return type</dt>
