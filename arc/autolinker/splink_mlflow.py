@@ -158,7 +158,7 @@ def log_splink_model_to_mlflow(
    
     _log_splink_model_json(splink_model_json)
     _log_hyperparameters(splink_model_json)
-    _log_comparisons(splink_model_json)
+    #_log_comparisons(splink_model_json)
     #_save_splink_model_to_mlflow(linker, model_name)
     model = SplinkMLFlowWrapper()
     model.set_spark_linker(linker)
