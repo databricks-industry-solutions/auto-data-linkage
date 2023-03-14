@@ -86,15 +86,15 @@ class AutoLinker:
     self.cluster_threshold=None
     self.original_entropies = dict()
 
-    # register pandas udf for calculating entropy
-    # TODO: replace with Milos' Spark function?
-
-    @F.pandas_udf(DoubleType())
-    def calculate_entropy(self, s: pd.Series)->float:
-      if len(s)<2:
-        return 0.0
-      base = len(s)
-      return ss.entropy(s.values, base=base)
+  # register pandas udf for calculating entropy
+  # TODO: replace with Milos' Spark function?
+  @staticmethod
+  @F.pandas_udf(DoubleType())
+  def calculate_entropy(s: pd.Series)->float:
+    if len(s)<2:
+      return 0.0
+    base = len(s)
+    return ss.entropy(s.values, base=base)
 
   def __str__(self):
     return f"AutoLinker instance working in {self.catalog}.{self.schema} and MLflow experiment {self.experiment_name}"
@@ -645,9 +645,10 @@ class AutoLinker:
     
      # Cluster records that are matched above threshold
     clusters = linker.cluster_pairwise_predictions_at_threshold(predictions, threshold_match_probability=threshold)
+    df_clusters = clusters.as_spark_dataframe()
     
     # Calculate mean change in entropy
-    information_gain = self._calculate_information_gain(data, clusters, attribute_columns)
+    information_gain = self._calculate_information_gain(df_clusters, attribute_columns)
     
     evals = {
       "information_gain": information_gain
