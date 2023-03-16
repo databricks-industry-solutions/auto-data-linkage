@@ -14,15 +14,14 @@ __all__ = [
 
 
 # noinspection PyUnresolvedReferences
-def _invoke_function(name, *args):
+def get_function(name):
     sc = SparkContext.getOrCreate()
-    functions_package = getattr(sc._jvm.com.databricks.industry.solutions.arc.functions, "package$")
-    functions_object = getattr(functions_package, "MODULE$")
+    functions_object = getattr(sc._jvm.com.databricks.industry.solutions.arc, "functions")
     jf = getattr(functions_object, name)
-    return Column(jf(*args))
+    return jf
 
 
-def arc_combinatorial_count_agg(*attributes: str) -> Column:
+def arc_combinatorial_count_agg(nc, *attributes: str) -> Column:
     """
     Call arc_combinatorial_count_agg function on the provided attributes.
 
@@ -36,9 +35,8 @@ def arc_combinatorial_count_agg(*attributes: str) -> Column:
     Column (MapType(StringType, LongType))
 
     """
-    return _invoke_function(
-        "arc_combinatorial_count_agg", *[_to_java_column(c) for c in attributes]
-    )
+    jf = get_function("arc_combinatorial_count_agg")
+    return Column(jf(nc, attributes))
 
 
 def arc_merge_count_map_agg(map_col: ColumnOrName) -> Column:
@@ -55,9 +53,8 @@ def arc_merge_count_map_agg(map_col: ColumnOrName) -> Column:
     Column (MapType(StringType, LongType))
 
     """
-    return _invoke_function(
-        "arc_merge_count_map_agg", _to_java_column(map_col)
-    )
+    jf = get_function("arc_merge_count_map_agg")
+    return Column(jf(_to_java_column(map_col)))
 
 
 def arc_entropy_agg(*attributes: str) -> Column:
@@ -74,6 +71,5 @@ def arc_entropy_agg(*attributes: str) -> Column:
     Column (MapType(StringType, DoubleType))
 
     """
-    return _invoke_function(
-        "arc_entropy_agg", *[_to_java_column(c) for c in attributes]
-    )
+    jf = get_function("arc_entropy_agg")
+    return Column(jf(attributes))

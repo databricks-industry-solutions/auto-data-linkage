@@ -1,7 +1,6 @@
 package com.databricks.industry.solutions.arc.expressions
 
 import com.databricks.industry.solutions.arc.expressions.base.{CountAccumulatorMap, Utils}
-import org.apache.commons.lang3.SerializationUtils
 import org.apache.spark.sql.catalyst.expressions.aggregate.{ImperativeAggregate, TypedImperativeAggregate}
 import org.apache.spark.sql.catalyst.expressions.Expression
 import org.apache.spark.sql.catalyst.InternalRow
@@ -33,11 +32,11 @@ case class ARC_MergeCountMapAgg(
     }
 
     override def serialize(buffer: CountAccumulatorMap): Array[Byte] = {
-        SerializationUtils.serialize(buffer.asInstanceOf[Serializable])
+        Utils.serialize(buffer)
     }
 
     override def deserialize(storageFormat: Array[Byte]): CountAccumulatorMap = {
-        SerializationUtils.deserialize(storageFormat).asInstanceOf[CountAccumulatorMap]
+        Utils.deserialize[CountAccumulatorMap](storageFormat)
     }
 
     override def withNewMutableAggBufferOffset(newMutableAggBufferOffset: Int): ImperativeAggregate =

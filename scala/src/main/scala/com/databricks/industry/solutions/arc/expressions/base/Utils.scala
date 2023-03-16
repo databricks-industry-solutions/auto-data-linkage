@@ -4,6 +4,8 @@ import org.apache.spark.sql.catalyst.util.{ArrayBasedMapBuilder, ArrayBasedMapDa
 import org.apache.spark.sql.types.{DoubleType, LongType, StringType}
 import org.apache.spark.unsafe.types.UTF8String
 
+import java.io.{ByteArrayInputStream, ByteArrayOutputStream, ObjectInputStream, ObjectOutputStream}
+
 object Utils {
 
     /**
@@ -35,4 +37,19 @@ object Utils {
         mapBuilder.putAll(keys, values)
         mapBuilder.build()
     }
+
+    def serialize(input: Any): Array[Byte] = {
+        val byteStream = new ByteArrayOutputStream()
+        val writer = new ObjectOutputStream(byteStream)
+        writer.writeObject(input)
+        writer.flush()
+        byteStream.toByteArray
+    }
+
+    def deserialize[T](bytes: Array[Byte]): T = {
+        val byteStream = new ByteArrayInputStream(bytes)
+        val reader = new ObjectInputStream(byteStream)
+        reader.readObject().asInstanceOf[T]
+    }
+
 }

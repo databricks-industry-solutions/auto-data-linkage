@@ -6,6 +6,8 @@ import org.apache.spark.unsafe.types.UTF8String
 
 case class CountAccumulatorMap(counter: Map[String, Long]) extends Serializable {
 
+    def this() = this(Map.empty)
+
     def merge(other: CountAccumulatorMap): CountAccumulatorMap = {
         val newKeys = other.counter.keySet ++ counter.keySet
         val newMap = newKeys.map { k => k -> (other.counter.getOrElse(k, 0L) + counter.getOrElse(k, 0L)) }.toMap

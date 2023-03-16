@@ -1,4 +1,4 @@
-from python.test.arc_test import ArcTestCase
+from test.utils import ArcTestCase
 
 
 class DummyTest(ArcTestCase):

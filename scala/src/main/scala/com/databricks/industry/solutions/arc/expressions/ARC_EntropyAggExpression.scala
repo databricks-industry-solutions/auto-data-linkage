@@ -1,42 +1,59 @@
 package com.databricks.industry.solutions.arc.expressions
 
-import com.databricks.industry.solutions.arc.expressions.base.{CountAccumulatorMap, Utils}
-import org.apache.commons.lang3.SerializationUtils
+import com.databricks.industry.solutions.arc.expressions.base._
+import com.esotericsoftware.kryo.Kryo
+import com.esotericsoftware.kryo.io.{Input, Output}
+import org.apache.commons.io.output.ByteArrayOutputStream
 import org.apache.spark.sql.catalyst.expressions.aggregate.{ImperativeAggregate, TypedImperativeAggregate}
 import org.apache.spark.sql.catalyst.expressions.Expression
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.types._
+
+import java.io.ByteArrayInputStream
 
 case class ARC_EntropyAggExpression(
     attributeExprs: Seq[Expression],
     attributeNames: Seq[String],
     mutableAggBufferOffset: Int = 0,
     inputAggBufferOffset: Int = 0
-) extends TypedImperativeAggregate[Map[String, CountAccumulatorMap]] {
+) extends TypedImperativeAggregate[EntropyCountAccumulatorMap] {
 
     private val attributeMap = attributeNames.zip(attributeExprs).toMap
 
+    private def serializer: Kryo = {
+        val kryo = new Kryo()
+        kryo.register(classOf[scala.Tuple2[Any, Any]], new com.twitter.chill.Tuple2Serializer)
+        kryo.register(classOf[Array[(String, Long)]])
+        kryo.register(classOf[Array[(String, Array[(String, Long)])]])
+        kryo.register(classOf[EntropyCountNestedList])
+        kryo
+    }
+
     override def children: Seq[Expression] = attributeMap.values.toSeq
 
-    override def createAggregationBuffer(): Map[String, CountAccumulatorMap] =
-        attributeMap.map(x => (x._1, CountAccumulatorMap())) + ("total" -> CountAccumulatorMap())
+    override def createAggregationBuffer(): EntropyCountAccumulatorMap =
+        EntropyCountAccumulatorMap(
+          attributeMap.map(x => (x._1, CountAccumulatorMap())) + ("total" -> CountAccumulatorMap())
+        )
 
-    override def update(buffer: Map[String, CountAccumulatorMap], input: InternalRow): Map[String, CountAccumulatorMap] = {
+    override def update(buffer: EntropyCountAccumulatorMap, input: InternalRow): EntropyCountAccumulatorMap = {
         val result = attributeMap.map { case (cn, expr) =>
             val value = expr.eval(input).toString
-            val countMap = buffer(cn)
+            val countMap = buffer.counter(cn)
             (cn, countMap ++ value)
 
-        } + ("total" -> (buffer("total") ++ "total"))
-        result
+        } + ("total" -> (buffer.counter("total") ++ "total"))
+        EntropyCountAccumulatorMap(result)
     }
 
     override def merge(
-        buffer: Map[String, CountAccumulatorMap],
-        input: Map[String, CountAccumulatorMap]
-    ): Map[String, CountAccumulatorMap] = {
-        val keys = buffer.keySet ++ input.keySet
-        keys.map { k => (k, buffer(k) merge input(k)) }.toMap
+        buffer: EntropyCountAccumulatorMap,
+        input: EntropyCountAccumulatorMap
+    ): EntropyCountAccumulatorMap = {
+        val keys = buffer.counter.keySet ++ input.counter.keySet
+        EntropyCountAccumulatorMap(
+          keys.map { k => (k, buffer.counter(k) merge input.counter(k)) }.toMap
+        )
     }
 
     def logDivisor(countMap: CountAccumulatorMap): Double = {
@@ -44,9 +61,9 @@ case class ARC_EntropyAggExpression(
         if (total <= 2) 1.0 else math.log(total)
     }
 
-    override def eval(buffer: Map[String, CountAccumulatorMap]): Any = {
-        val total = buffer("total").counter("total")
-        val entropy = buffer
+    override def eval(buffer: EntropyCountAccumulatorMap): Any = {
+        val total = buffer.counter("total").counter("total")
+        val entropy = buffer.counter
             .map { case (cn, countMap) =>
                 val entropy = countMap.counter.map { case (_, count) =>
                     val p = count.toDouble / total
@@ -58,11 +75,20 @@ case class ARC_EntropyAggExpression(
         Utils.buildMapDouble(entropy)
     }
 
-    override def serialize(buffer: Map[String, CountAccumulatorMap]): Array[Byte] =
-        SerializationUtils.serialize(buffer.asInstanceOf[Serializable])
+    override def serialize(buffer: EntropyCountAccumulatorMap): Array[Byte] = {
+        val toSerialize = EntropyCountNestedList(buffer)
+        val output = new ByteArrayOutputStream()
+        val kryoOutput = new Output(output)
+        serializer.writeObject(kryoOutput, toSerialize)
+        output.toByteArray
+    }
 
-    override def deserialize(storageFormat: Array[Byte]): Map[String, CountAccumulatorMap] =
-        SerializationUtils.deserialize(storageFormat).asInstanceOf[Map[String, CountAccumulatorMap]]
+    override def deserialize(storageFormat: Array[Byte]): EntropyCountAccumulatorMap = {
+        val input = new ByteArrayInputStream(storageFormat)
+        val kryoInput = new Input(input)
+        val readObject = serializer.readObject(kryoInput, classOf[EntropyCountNestedList])
+        readObject.toMap
+    }
 
     override def withNewMutableAggBufferOffset(newMutableAggBufferOffset: Int): ImperativeAggregate =
         copy(mutableAggBufferOffset = newMutableAggBufferOffset)
