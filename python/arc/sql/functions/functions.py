@@ -15,7 +15,7 @@ __all__ = [
 
 # noinspection PyUnresolvedReferences
 def _invoke_function(name, *args):
-    sc = SparkContext._active_spark_context
+    sc = SparkContext.getOrCreate()
     functions_package = getattr(sc._jvm.com.databricks.industry.solutions.arc.functions, "package$")
     functions_object = getattr(functions_package, "MODULE$")
     jf = getattr(functions_object, name)
