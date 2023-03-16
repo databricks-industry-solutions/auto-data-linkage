@@ -1,4 +1,4 @@
-import auto_attach
+from . import auto_attach
 
 auto_attach._auto_attach()
 
