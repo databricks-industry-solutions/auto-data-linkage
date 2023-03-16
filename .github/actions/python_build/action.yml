@@ -22,5 +22,5 @@ runs:
     - name: Copy python artifacts to GH Actions run
       shell: bash
       run: |
-        mkdir ./staging
-        cp python/dist/*.whl staging/
+        mkdir -p staging
+        cp python/dist/*.whl staging
