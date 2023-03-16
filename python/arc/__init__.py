@@ -1,3 +1,3 @@
-from .arc import functions
+from . import functions
 
 __version__ = "0.0.1"
