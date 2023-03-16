@@ -28,4 +28,4 @@ runs:
           shell: bash
           run: |
             mkdir -p staging
-            cp target/*.jar staging
+            cp scala/target/*.jar staging
