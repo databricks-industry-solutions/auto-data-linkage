@@ -12,8 +12,7 @@ class SparkTestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         SparkSession._instantiatedContext = None
-        cls.library_location = "/Users/milos.colic/IdeaProjects/splink-public-sector-hackathon/python/arc/lib/arc-0.0.1-jar-with-dependencies.jar"
-        #f"{arc.__path__[0]}/lib/arc-{version('databricks-arc')}-jar-with-dependencies.jar"
+        cls.library_location = f"{arc.__path__[0]}/lib/arc-{version('databricks-arc')}-jar-with-dependencies.jar"
         cls.spark = (
             SparkSession.builder.master("local")
             .config("spark.jars", cls.library_location)
