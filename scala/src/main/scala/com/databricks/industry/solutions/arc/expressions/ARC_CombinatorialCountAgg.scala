@@ -15,6 +15,7 @@ case class ARC_CombinatorialCountAgg(
 ) extends TypedImperativeAggregate[CountAccumulatorMap] {
 
     private val attributeMap = attributeNames.zip(attributeExprs).toMap
+    private val reverseMap = attributeMap.map(_.swap)
     private val combinations = attributeMap.values.toList.combinations(nCombination).toList
 
     override def children: Seq[Expression] = attributeMap.values.toSeq
@@ -23,8 +24,11 @@ case class ARC_CombinatorialCountAgg(
 
     override def update(buffer: CountAccumulatorMap, input: InternalRow): CountAccumulatorMap = {
         val left = combinations.map(
-          _.map(_.eval(input))
-              .mkString("", ",", "")
+          combination => {
+              val combValue = combination.map(_.eval(input).toString).mkString("", ",", "")
+              val combKey = combination.map(reverseMap).mkString("", ",", ";")
+              combKey + combValue
+          }
         )
         buffer.merge(CountAccumulatorMap(left))
     }
