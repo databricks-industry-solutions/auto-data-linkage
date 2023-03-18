@@ -1,7 +1,7 @@
 from typing import Union
 
 from pyspark import SparkContext
-from pyspark.sql import Column
+from pyspark.sql import Column, DataFrame, SQLContext
 from pyspark.sql.column import _to_java_column
 
 ColumnOrName = Union[Column, str]
@@ -73,3 +73,27 @@ def arc_entropy_agg(*attributes: str) -> Column:
     """
     jf = get_function("arc_entropy_agg")
     return Column(jf(attributes))
+
+
+def arc_generate_blocking_rules(df, n, k, *attributes: str) -> DataFrame:
+    """
+    Generate blocking rules for the provided attributes.
+
+    Parameters
+    ----------
+    df : DataFrame
+        DataFrame to be used to generate the blocking rules.
+    n : int
+        Number of rows to be used to generate the blocking rules.
+    k : int
+        Number of blocking rules to be generated.
+    attributes : *str
+        Variable number of attributes to be used in the function.
+
+    Returns
+    -------
+    Column (ArrayType(ArrayType(StringType)))
+
+    """
+    jf = get_function("arc_generate_blocking_rules")
+    return DataFrame(jf(df._jdf, n, k, attributes), SQLContext(SparkContext.getOrCreate()))

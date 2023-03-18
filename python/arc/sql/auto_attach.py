@@ -5,7 +5,7 @@ from pyspark import SparkContext
 from pyspark.sql import SparkSession
 
 
-def _auto_attach():
+def auto_attach():
     spark = SparkSession.builder.getOrCreate()
 
     _auto_attach_enabled = (
