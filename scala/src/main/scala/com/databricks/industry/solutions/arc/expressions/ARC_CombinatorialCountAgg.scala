@@ -25,8 +25,8 @@ case class ARC_CombinatorialCountAgg(
     override def update(buffer: CountAccumulatorMap, input: InternalRow): CountAccumulatorMap = {
         val left = combinations.map(
           combination => {
+              val combKey = combination.map(reverseMap).mkString("", " AND ", ";")
               val combValue = combination.map(_.eval(input).toString).mkString("", ",", "")
-              val combKey = combination.map(reverseMap).mkString("", ",", ";")
               combKey + combValue
           }
         )
