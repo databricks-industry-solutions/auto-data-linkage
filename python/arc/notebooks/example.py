@@ -1,5 +1,5 @@
 # Databricks notebook source
-# MAGIC %pip install --quiet splink # mlflow hyperopt
+# MAGIC %pip install --quiet splink mlflow hyperopt
 
 # COMMAND ----------
 
