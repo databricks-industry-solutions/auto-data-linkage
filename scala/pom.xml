@@ -204,7 +204,7 @@
                             <goal>copy-resources</goal>
                         </goals>
                         <configuration>
-                            <outputDirectory>${basedir}/python/mosaic/lib</outputDirectory>
+                            <outputDirectory>${basedir}/../python/arc/lib</outputDirectory>
                             <resources>
                                 <resource>
                                     <directory>${basedir}/target/</directory>
@@ -239,7 +239,7 @@
         <repository>
             <id>github</id>
             <name>GitHub Packages</name>
-            <url>https://maven.pkg.github.com/databrickslabs/mosaic</url>
+            <url>https://maven.pkg.github.com/databricks-industry-solutions/auto-data-linkage</url>
         </repository>
     </distributionManagement>
 
