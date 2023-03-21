@@ -35,7 +35,7 @@ case class ARC_GeneratePartialCombinations(
             .toArray
             .map(combination => partials ++ combination)
 
-        val result = if (combinations.isEmpty) Array(partials) else combinations
+        val result = if (combinations.isEmpty | nComb < 1) Array(partials) else combinations
 
         result
             .map(_.sorted)

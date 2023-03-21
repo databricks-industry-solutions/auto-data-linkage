@@ -73,6 +73,22 @@ trait ARC_GenerateCombinationsBehaviors extends QueryTest {
 
         result.size shouldEqual n
 
+        val result2 = testData
+            .withColumn(
+                "combinations",
+                arc_generate_combinations(2, col("columns"))
+            )
+            .select(
+                arc_generate_partial_combinations(1, col("combinations"), col("columns")).as("combinations")
+            )
+            .distinct()
+            .as[Seq[String]]
+            .collect()
+            .toSeq
+
+        val n2 = values.combinations(3).size
+
+        result2.size shouldEqual n2
     }
 
 }

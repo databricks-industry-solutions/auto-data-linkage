@@ -62,9 +62,9 @@ object ARC {
         val dfN1 = generateRules(baseDf, 1)
 
         if (k > 1) {
-            (2 to k).foldLeft(dfN1)((df, i) => df union generateRules(baseDf, i))
+            (2 to k).foldLeft(dfN1)((df, i) => df union generateRules(baseDf, i)).distinct()
         } else {
-            dfN1
+            dfN1.distinct()
         }
 
     }

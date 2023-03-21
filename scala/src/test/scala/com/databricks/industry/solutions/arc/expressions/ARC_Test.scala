@@ -13,6 +13,17 @@ class ARC_Test extends QueryTest with SharedSparkSession {
 
         import scala.collection.JavaConverters._
 
+        val values = Seq(
+            (1, "a", "b", "c", "d"),
+            (2, "a", "b", "c", "d"),
+            (3, "a", "b", "c", "d"),
+            (4, "g", "h1", ";", "a0"),
+            (5, "g", "h2", ";", "a1"),
+            (6, "g", "h3", ";", "a2"),
+            (7, "g", "h1", ";", "a2"),
+            (9, "g", "h2", ";", "a1")
+        )
+
         val testData = spark
             .createDataFrame(
               Seq(
