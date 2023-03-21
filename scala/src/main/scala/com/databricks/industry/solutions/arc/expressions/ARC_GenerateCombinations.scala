@@ -3,9 +3,7 @@ package com.databricks.industry.solutions.arc.expressions
 import org.apache.spark.sql.catalyst.expressions.{CollectionGenerator, Expression, ExpressionInfo}
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.codegen.CodegenFallback
-import org.apache.spark.sql.catalyst.util.ArrayData
 import org.apache.spark.sql.types._
-import org.apache.spark.unsafe.types.UTF8String
 
 case class ARC_GenerateCombinations(
     nCombinationsExpr: Expression,
@@ -21,17 +19,7 @@ case class ARC_GenerateCombinations(
     override def children: Seq[Expression] = Seq(nCombinationsExpr, elementsExpr)
 
     override def eval(input: InternalRow): TraversableOnce[InternalRow] = {
-        val arrayData = elementsExpr.eval(input).asInstanceOf[ArrayData]
-        val nComb = nCombinationsExpr.eval(input).asInstanceOf[Int]
-        val elements = arrayData
-            .toArray[UTF8String](StringType)
-            .toSeq
-            .asInstanceOf[Seq[UTF8String]]
-            .map(_.toString)
-        val combinations = elements
-            .combinations(nComb)
-            .toArray
-            .map(combination => ArrayData.toArrayData(combination.map(UTF8String.fromString)))
+        val combinations = ARC_Combinations.evalCombinations(input, nCombinationsExpr, elementsExpr)
         combinations.map(row => InternalRow.fromSeq(Seq(row)))
     }
 

@@ -47,6 +47,22 @@ object functions {
         arc_generate_combinations(n, elements.asScala: _*)
     }
 
+    def arc_generate_partial_combinations(n: Int, partials: Column, elements: Column): Column = {
+        new Column(ARC_GeneratePartialCombinations(lit(n).expr, partials.expr, elements.expr))
+    }
+
+    def arc_combinations(n: Int, elements: Column): Column = {
+        new Column(ARC_Combinations(lit(n).expr, elements.expr))
+    }
+
+    def arc_combinations(n: Int, elements: String*): Column = {
+        arc_combinations(n, array(elements.map(el => lit(el)): _*))
+    }
+
+    def arc_combinations(n: Int, elements: java.util.ArrayList[String]): Column = {
+        arc_combinations(n, elements.asScala: _*)
+    }
+
     def arc_to_splink_rule(rule_combination: Column): Column = {
         new Column(ARC_ToSplinkRule(rule_combination.expr))
     }

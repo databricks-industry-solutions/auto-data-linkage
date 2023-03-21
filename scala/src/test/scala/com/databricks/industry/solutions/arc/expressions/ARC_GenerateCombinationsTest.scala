@@ -5,6 +5,8 @@ import org.apache.spark.sql.test.SharedSparkSession
 
 class ARC_GenerateCombinationsTest extends QueryTest with SharedSparkSession with ARC_GenerateCombinationsBehaviors {
 
-    test("ARC_CombinatorialCountAgg expression") { testGenerateCombinations() }
+    test("ARC_GenerateCombinations expression") { testGenerateCombinations() }
+
+    test("ARC_GeneratePartialCombinations expression") { testGeneratePartialCombinations() }
 
 }

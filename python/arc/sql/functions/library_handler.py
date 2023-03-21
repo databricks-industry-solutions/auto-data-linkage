@@ -1,0 +1,89 @@
+import importlib.metadata
+import importlib.resources
+import os
+
+from py4j.protocol import Py4JJavaError
+
+
+class LibraryHandler:
+    spark = None
+    sc = None
+    _jar_path = None
+    _jar_filename = None
+    _auto_attached_enabled = None
+
+    def __init__(self, spark):
+        self.spark = spark
+        self.sc = spark.sparkContext
+        self.sc.setLogLevel("info")
+        log4jLogger = self.sc._jvm.org.apache.log4j
+        LOGGER = log4jLogger.LogManager.getLogger(__class__.__name__)
+
+        if self.auto_attach_enabled:
+            LOGGER.info(f"Looking for ARC JAR at {self.arc_library_location}.")
+            if not os.path.exists(self.arc_library_location):
+                raise FileNotFoundError(
+                    f"ARC JAR package {self._jar_filename} could not be located at {self.arc_library_location}."
+                )
+            LOGGER.info(f"Automatically attaching ARC JAR to cluster.")
+            self.auto_attach()
+
+    @property
+    def auto_attach_enabled(self) -> bool:
+        if not self._auto_attached_enabled:
+            try:
+                result = (
+                        self.spark.conf.get("spark.databricks.industry.solutions.arc.jar.autoattach")
+                        == "true"
+                )
+            except Py4JJavaError as e:
+                result = True
+            self._auto_attached_enabled = result
+        return self._auto_attached_enabled
+
+    @property
+    def arc_library_location(self):
+        if not self._jar_path:
+            try:
+                self._jar_path = self.spark.conf.get(
+                    "spark.databricks.industry.solutions.arc.jar.path"
+                )
+                self._jar_filename = self._jar_path.split("/")[-1]
+            except Py4JJavaError as e:
+                self._jar_filename = f"arc-{importlib.metadata.version('databricks-arc')}-jar-with-dependencies.jar"
+                try:
+                    with importlib.resources.path("arc.lib", self._jar_filename) as p:
+                        self._jar_path = p.as_posix()
+                except FileNotFoundError as fnf:
+                    self._jar_filename = f"arc-{importlib.metadata.version('databricks-arc')}-SNAPSHOT-jar-with-dependencies.jar"
+                    with importlib.resources.path("arc.lib", self._jar_filename) as p:
+                        self._jar_path = p.as_posix()
+        return self._jar_path
+
+    def auto_attach(self):
+        JavaURI = getattr(self.sc._jvm.java.net, "URI")
+        JavaJarId = getattr(self.sc._jvm.com.databricks.libraries, "JavaJarId")
+        ManagedLibraryId = getattr(
+            self.sc._jvm.com.databricks.libraries, "ManagedLibraryId"
+        )
+        ManagedLibraryVersions = getattr(
+            self.sc._jvm.com.databricks.libraries, "ManagedLibraryVersions"
+        )
+        NoVersion = getattr(ManagedLibraryVersions, "NoVersion$")
+        NoVersionModule = getattr(NoVersion, "MODULE$")
+        DatabricksILoop = getattr(
+            self.sc._jvm.com.databricks.backend.daemon.driver, "DatabricksILoop"
+        )
+        converters = self.sc._jvm.scala.collection.JavaConverters
+
+        JarURI = JavaURI.create("file:" + self._jar_path)
+        lib = JavaJarId(
+            JarURI,
+            ManagedLibraryId.defaultOrganization(),
+            NoVersionModule.simpleString(),
+        )
+        libSeq = converters.asScalaBufferConverter((lib,)).asScala().toSeq()
+
+        context = DatabricksILoop.getSharedDriverContextIfExists().get()
+        context.registerNewLibraries(libSeq)
+        context.attachLibrariesToSpark(libSeq)

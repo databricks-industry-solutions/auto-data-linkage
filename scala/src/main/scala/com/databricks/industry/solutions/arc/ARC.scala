@@ -45,9 +45,14 @@ object ARC {
             val nPartitions = spark.conf.get("spark.sql.shuffle.partitions").toInt
             df
                 .select(
-                  arc_generate_combinations(n, col("rules")) as "combinations"
+                  arc_generate_combinations(2, col("rules")) as "combinations",
+                  col("rules")
                 )
                 .repartition(nPartitions, col("combinations"))
+                .select(
+                  arc_generate_partial_combinations(n - 2, col("combinations"), col("rules")) as "combinations"
+                )
+                .distinct()
                 .select(
                   arc_to_splink_rule(col("combinations")) as "splink_rule",
                   arc_estimate_squared_count_or(col("combinations"), countMap) as "rule_squared_count"
