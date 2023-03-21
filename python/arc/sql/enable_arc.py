@@ -10,7 +10,7 @@ def enable_arc():
     spark = SparkSession.getActiveSession()
     if spark is not None:
         _auto_attach_enabled = (
-            spark.conf.get("spark.databricks.industry.solutions.jar.autoattach", "false") == "true"
+            spark.conf.get("spark.databricks.industry.solutions.jar.autoattach", "true") == "true"
         )
 
         if _auto_attach_enabled:

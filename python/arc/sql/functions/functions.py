@@ -1,5 +1,6 @@
-from typing import Union
+import warnings
 
+from typing import Union
 from pyspark import SparkContext
 from pyspark.sql import Column, DataFrame, SQLContext
 from pyspark.sql.column import _to_java_column
@@ -96,4 +97,6 @@ def arc_generate_blocking_rules(df, n, k, *attributes: str) -> DataFrame:
 
     """
     jf = get_function("arc_generate_blocking_rules")
-    return DataFrame(jf(df._jdf, n, k, attributes), SQLContext(SparkContext.getOrCreate()))
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        return DataFrame(jf(df._jdf, n, k, attributes), SQLContext(SparkContext.getOrCreate()))
