@@ -116,7 +116,7 @@ class AutoLinker:
     
     df_entropy = data \
       .groupBy(cluster_groupby) \
-      .agg(arcf.arc_entropy_agg(column).select(F.col(f"arc_entropyaggexpression({column}).{column}").alias(f"entropy")))
+      .agg(arcf.arc_entropy_agg(column)).select(F.col(f"arc_entropyaggexpression({column}).{column}").alias(f"entropy"))
     
     mean_entropy = df_entropy.select(F.mean("entropy").alias("mean_entropy")).collect()[0]["mean_entropy"]
     
