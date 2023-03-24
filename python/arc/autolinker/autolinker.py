@@ -2,6 +2,7 @@ from pyspark.sql import functions as F
 from pyspark.sql.types import *
 from pyspark.sql import Window
 import pyspark
+from arc.sql import functions as arcf
 
 # from dbruntime.display import displayHTML
 
@@ -86,15 +87,6 @@ class AutoLinker:
     self.cluster_threshold=None
     self.original_entropies = dict()
 
-  # register pandas udf for calculating entropy
-  # TODO: replace with Milos' Spark function?
-  @staticmethod
-  @F.pandas_udf(DoubleType())
-  def calculate_entropy(s: pd.Series)->float:
-    if len(s)<2:
-      return 0.0
-    base = len(s)
-    return ss.entropy(s.values, base=base)
 
   def __str__(self):
     return f"AutoLinker instance working in {self.catalog}.{self.schema} and MLflow experiment {self.experiment_name}"
@@ -119,19 +111,12 @@ class AutoLinker:
     
     if by_cluster:
       cluster_groupby = "cluster_id"
-      cluster_join = "cluster_id"
     else:
       cluster_groupby = F.lit(1)
-      cluster_join = F.lit(1)==F.lit(1)
     
-    # Get P values
-    counts = data.groupBy(cluster_groupby).count().withColumnRenamed("count", "group_count")
-    data = data.join(counts, on=[cluster_join], how="left")
-    data = data.groupBy([cluster_groupby, column]).agg(F.count(F.col(column)).alias(f"{column}_count"), F.max("group_count").alias("group_count"))
-    data = data.withColumn("P", F.col(f"{column}_count")/F.col("group_count"))
-    data = data.groupBy(cluster_groupby).agg(self.calculate_entropy(data["P"]).alias("entropy"))
+    df_entropy = data.groupBy(cluster_groupby).agg(arcf.arc_entropy_agg(column).select(F.col(f"arc_entropyaggexpression({column}).{column}").alias(f"entropy"))
     
-    mean_entropy = data.select(F.mean("entropy").alias("mean_entropy")).collect()[0]["mean_entropy"]
+    mean_entropy = df_entropy.select(F.mean("entropy").alias("mean_entropy")).collect()[0]["mean_entropy"]
     
     return mean_entropy
 
@@ -226,7 +211,8 @@ class AutoLinker:
     attribute_columns:list,
     comparison_size_limit:int,
     unique_id:str,
-    max_columns_per_rule:int=2
+    max_columns_per_and_rule:int=2,
+    max_rules_per_or_rule:int=3,
   ) -> list:
     """
     Method to automatically generate a list of lists of blocking rules to test, given a user-defined limit for
@@ -238,38 +224,21 @@ class AutoLinker:
     :param attribute_columns: valid column names of data, containing all possible columns to block on
     :param comparison_size_limit: the maximum number of pairs we want to compare, to limit hardware issues
     :param unique_id: the name of the unique ID column in data
-    :param max_columns_per_rule: the maximum number of column comparisons in a single rule to try
+    :param max_columns_per_and_rule: the maximum number of column comparisons in a single rule to try
+    :param max_rules_per_or_rule: the maximum number of rules comparisons in a composite rule to try
 
     """
 
-    # initialise empty list to store all combinations in
-    blocking_combinations = []
+    # replace null values with dummy
+    data = data.fillna("null_")
 
-    # create list of all possible rules
-    for n in range(1, max_columns_per_rule+1):
-      combs = list(itertools.combinations(attribute_columns, n))
-      blocking_combinations.extend(combs)
+    # Create blocking rules and size esimates
+    df_rules = arcf.arc_generate_blocking_rules(data, max_columns_per_and_rule, max_rules_per_or_rule, *attribute_columns)
 
-    # Convert them to Splink-compatible rules
-    blocking_rules = self._generate_rules(["&".join(r) for r in blocking_combinations])
-    
-    # Estimate number of pairs per blocking rule by grouping on blocking rule columns and getting the sum of squares of counts
-    comp_size_dict = dict()
+    # Filter on max
+    rules = df_rules.filter(f"rule_squared_count > {comparison_size_limit}").collect()
 
-    for comb, rule in zip(blocking_combinations, blocking_rules):
-      num_pairs = data.groupBy(list(comb)).count().select(F.sum(F.col("count")*F.col("count"))).collect()[0]["sum((count * count))"]
-      comp_size_dict.update({rule: num_pairs})
-    
-    # loop through all combinations of combinations and save those which remain under the limit (this is a bit brute force)
-    accepted_rules = []
-    for r in range(1, len(blocking_rules)+1):
-      for c in itertools.combinations(blocking_rules, r):
-        if sum([v for k, v in comp_size_dict.items() if k in c])<=comparison_size_limit:
-          accepted_rules.append(list(c))
-
-
-    if len(accepted_rules)<1:
-      raise ValueError("No blocking rules meet the comparison size limit.")
+    accepted_rules = [rule.splink_rule for rule in rules]
           
     return accepted_rules
 
@@ -627,7 +596,8 @@ class AutoLinker:
     threshold:float,
     attribute_columns:list,
     unique_id:str,
-    linker:splink.spark.spark_linker.SparkLinker
+    linker:splink.spark.spark_linker.SparkLinker,
+    true_label:str=None
     ) -> dict:
     """
     Method to evaluate predictions made by a trained linker model.
@@ -639,7 +609,8 @@ class AutoLinker:
     :param threshold: float indicating the probability threshold above which a pair is considered a match
     :param attribute_columns: list of strings with valid column names to compare the entropies of
     :param linker: isntance of splink.SparkLinker, used for deduplication (clustering)
-    
+    :param true_label: The name of the column with true record ids, if exists (default None) - if not None, auto_link will attempt to calculate empirical scores
+
     """
 
     
@@ -649,10 +620,19 @@ class AutoLinker:
     
     # Calculate mean change in entropy
     information_gain = self._calculate_information_gain(df_clusters, attribute_columns)
-    
-    evals = {
-      "information_gain": information_gain
-    }
+
+    # empirical scores      
+    evals = dict()
+
+    if true_label:
+      df_predictions = predictions.as_spark_dataframe()
+      scores = self.get_confusion_metrics(data, df_predictions, threshold, unique_id, true_label)
+
+      for k, v in scores.items():
+        evals.update({k:v})
+
+    evals["information_gain"] = information_gain
+
 
     return evals
   
@@ -666,7 +646,8 @@ class AutoLinker:
     unique_id:str,
     deterministic_columns:list=None,
     training_columns:list=None,
-    threshold:float=0.9
+    threshold:float=0.9,
+    true_label:str=None
     ) -> typing.Tuple[
       splink.spark.spark_linker.SparkLinker,
       splink.splink_dataframe.SplinkDataFrame,
@@ -686,7 +667,7 @@ class AutoLinker:
     :param deterministic columns: list of strings containint columns to block on - if None, they will be generated automatically/randomly
     :param training_columns: list of strings containing training columns - if None, they will be generated automatically/randomly
     :param threshold: float indicating the probability threshold above which a pair is considered a match
-    
+    :param true_label: The name of the column with true record ids, if exists (default None) - if not None, auto_link will attempt to calculate empirical scores
     """
 
     #set start time for measuring training duration
@@ -700,7 +681,7 @@ class AutoLinker:
     duration = (end-start).seconds
     
     # Evaluate model
-    evals = self.evaluate_linker(data, predictions, threshold, attribute_columns, unique_id, linker)
+    evals = self.evaluate_linker(data, predictions, threshold, attribute_columns, unique_id, linker, true_label)
 
     with mlflow.start_run() as run:
       splink_mlflow.log_splink_model_to_mlflow(linker, "linker")
@@ -727,7 +708,8 @@ class AutoLinker:
     cleaning="all",
     deterministic_columns:list=None,
     training_columns:list=None,
-    threshold:float=0.9
+    threshold:float=0.9,
+    true_label:str=None
   ) -> None:
     """
     Method to run a series of hyperopt trials.
@@ -743,7 +725,7 @@ class AutoLinker:
     :param deterministic columns: list of strings containint columns to block on - if None, they will be generated automatically/randomly
     :param training_columns: list of strings containing training columns - if None, they will be generated automatically/randomly
     :param threshold: float indicating the probability threshold above which a pair is considered a match
-
+    :param true_label: The name of the column with true record ids, if exists (default None) - if not None, auto_link will attempt to calculate empirical scores
     
     """
     
@@ -943,3 +925,82 @@ class AutoLinker:
     return self.best_linker.match_weights_chart()
     
     
+  def get_scores_df(self, data_df, predictions_df, unique_id, true_label):
+    left_df = data_df.select(F.col(unique_id).alias(f"{unique_id}_l"), F.col(true_label).alias("true_label"))
+    right_df = data_df.select(F.col(unique_id).alias(f"{unique_id}_r"), F.col(true_label).alias("score_label"))
+    
+    return predictions_df\
+      .select("match_probability", f"{unique_id}_l", f"{unique_id}_r")\
+      .join(left_df, on=[f"{unique_id}_l"])\
+      .join(right_df, on=[f"{unique_id}_r"])\
+      .withColumnRenamed("match_probability", "probability")
+    
+  def get_RR_count(self, data_df, unique_id, true_label):
+    left_df = data_df.select(F.col(true_label), F.col(unique_id).alias(f"{unique_id}_l"))
+    right_df = data_df.select(F.col(true_label), F.col(unique_id).alias(f"{unique_id}_r"))
+    
+    pairs_df = left_df\
+      .join(right_df, on=[true_label])\
+      .where(f"{unique_id}_l != {unique_id}_r")
+    
+    unique_pairs_df = pairs_df\
+      .withColumn("pairs", F.array(F.col(f"{unique_id}_l"), F.col(f"{unique_id}_r")))\
+      .withColumn("pairs", F.array_sort("pairs"))
+      
+    return unique_pairs_df\
+      .groupBy("pairs").count()\
+      .count()
+  
+  def get_PR_count(self, scores_df, unique_id):
+    unique_pairs_df = scores_df\
+      .withColumn("pairs", F.array(F.col(f"{unique_id}_l"), F.col(f"{unique_id}_r")))\
+      .withColumn("pairs", F.array_sort("pairs"))
+    
+    return unique_pairs_df\
+      .groupBy("pairs").count()\
+      .count()
+  
+  
+  def get_confusion_metrics(self, data_df, predictions_df, thld, unique_id, true_label):
+    
+    scores_df = self.get_scores_df(data_df, predictions_df, unique_id, true_label)
+  
+    # RR - Relevant Records
+    RR = self.get_RR_count(data_df, unique_id, true_label)
+      
+    calibrated_scores_df = scores_df.where((F.col("probability") > thld))
+
+    FP = calibrated_scores_df.where(F.col("true_label") != F.col("score_label")).count()
+    TP = calibrated_scores_df.where(F.col("true_label") == F.col("score_label")).count()
+    # PR - Positive Records
+    PR = self.get_PR_count(calibrated_scores_df, unique_id)
+
+    if (PR > 0):
+      precision = TP / PR
+    else:
+      precision = 0
+      
+    if (RR > 0):
+      recall = TP / RR
+    else:
+      recall = 0
+
+    if (precision+recall > 0):
+      f1 = 2*precision*recall/(precision+recall)
+    else:
+      f1 = 0
+
+    if (PR + FP)>0:
+      jaccard = TP/(PR + FP)
+    else:
+      jaccard = 0
+
+    scores = {
+      "threshold": thld,
+      "f1_score": f1,
+      "precision": precision,
+      "recall": recall,
+      "jaccard": jaccard
+      }
+
+    return scores
