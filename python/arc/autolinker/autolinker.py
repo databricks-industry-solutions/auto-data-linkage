@@ -252,7 +252,8 @@ class AutoLinker:
     attribute_columns:list,
     comparison_size_limit:int,
     unique_id:str,
-    max_columns_per_rule:int=2
+    max_columns_per_and_rule:int=2,
+    max_rules_per_or_rule:int=3
   ) -> dict:
     """
     Method to create hyperopt space for comparison and blocking rule hyperparameters from list of columns.
@@ -264,7 +265,8 @@ class AutoLinker:
     :param data: input data with records per row
     :param attribute_columns: valid column names of data, containing all possible columns to compare
     :param comparison_size_limit: maximum number of pairs we want to compare, to limit hardware issues
-    :param max_columns_per_rule: the maximum number of column comparisons in a single rule to try
+    :param max_columns_per_and_rule: the maximum number of column comparisons in a single rule to try
+    :param max_rules_per_or_rule: the maximum number of rules comparisons in a composite rule to try
     
     """
 
@@ -274,7 +276,8 @@ class AutoLinker:
       attribute_columns=attribute_columns,
       comparison_size_limit=comparison_size_limit,
       unique_id=unique_id,
-      max_columns_per_rule=max_columns_per_rule
+      max_columns_per_and_rule=max_columns_per_and_rule,
+      max_rules_per_or_rule=max_rules_per_or_rule
     )
 
     # Create comparison dictionary using Hyperopt sampling
