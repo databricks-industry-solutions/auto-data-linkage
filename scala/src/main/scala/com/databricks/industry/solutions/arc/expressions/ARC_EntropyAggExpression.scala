@@ -42,7 +42,7 @@ case class ARC_EntropyAggExpression(
             val countMap = buffer.counter(cn)
             (cn, countMap ++ value)
 
-        } + ("total" -> (buffer.counter("total") ++ "total"))
+        }
         EntropyCountAccumulatorMap(result)
     }
 
@@ -58,20 +58,19 @@ case class ARC_EntropyAggExpression(
 
     def logDivisor(countMap: CountAccumulatorMap): Double = {
         val total = countMap.counter.size
-        if (total <= 2) 1.0 else math.log(total)
+        if (total < 2 | total == 10) 1.0 else math.log10(total)
     }
 
     override def eval(buffer: EntropyCountAccumulatorMap): Any = {
-        val total = buffer.counter("total").counter("total")
         val entropy = buffer.counter
             .map { case (cn, countMap) =>
+                val total = countMap.counter.values.sum
                 val entropy = countMap.counter.map { case (_, count) =>
                     val p = count.toDouble / total
-                    -p * math.log(p) / logDivisor(countMap)
+                    -p * math.log10(p) / logDivisor(countMap)
                 }.sum
                 (cn, entropy)
             }
-            .filterNot(_._1 == "total")
         Utils.buildMapDouble(entropy)
     }
 
