@@ -3,7 +3,12 @@
 
 # COMMAND ----------
 
-from arc.autolinker.autolinker import AutoLinker
+from arc.autolinker import AutoLinker
+import arc
+
+# COMMAND ----------
+
+arc.sql.enable_arc()
 
 # COMMAND ----------
 
@@ -13,17 +18,12 @@ from arc.autolinker.autolinker import AutoLinker
 
 # COMMAND ----------
 
+# data = spark.read.table("marcell_autosplink.febrl1_uid")
 data = spark.read.table("marcell_autosplink.voters_data_sample")
 
 # COMMAND ----------
 
-# this is here to set defaults - Autolinker() will use the spark default catalog and database if not provided as args
-spark.sql("use catalog robert_whiffin_uc")
-spark.sql("use database autosplink")
-
-# COMMAND ----------
-
-data.display()
+data.columns
 
 
 # COMMAND ----------
@@ -37,40 +37,16 @@ autolinker = AutoLinker()
 
 # COMMAND ----------
 
+attr_cols = ["givenname", "surname", "postcode", "suburb"]
+
+# COMMAND ----------
+
 autolinker.auto_link(
   data=data,                                                             # dataset to dedupe
-  attribute_columns=["givenname", "surname", "suburb", "postcode"],      # columns that contain attributes to compare
+  attribute_columns=attr_cols,                                           # columns that contain attributes to compare
   unique_id="uid",                                                       # column name of the unique ID
   comparison_size_limit=200000,                                          # Maximum number of pairs when blocking applied
-  max_evals=10                                                            # Maximum number of hyperopt trials to run
+  max_evals=1000,                                                        # Maximum number of hyperopt trials to run
+  threshold=0.5,
+  true_label="recid"
 )
-
-# COMMAND ----------
-
-display(
-  autolinker.best_predictions()
-)
-
-# COMMAND ----------
-
-import pyspark.sql.functions as F
-from pyspark.sql import Window
-
-display(
-  autolinker.best_clusters_at_threshold()# default=0.8
-  .withColumn("size", F.count("*").over(Window.partitionBy("cluster_id")))
-  .orderBy(-F.col("size"))
-)
-
-# COMMAND ----------
-
-autolinker.cluster_viewer()
-
-# COMMAND ----------
-
-autolinker.comparison_viewer()
-
-# COMMAND ----------
-
-autolinker.match_weights_chart()
-
