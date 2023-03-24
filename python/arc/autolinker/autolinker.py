@@ -114,6 +114,9 @@ class AutoLinker:
     else:
       cluster_groupby = F.lit(1)
     
+    # replace null values with dummy
+    data = data.fillna("null_")
+
     df_entropy = data \
       .groupBy(cluster_groupby) \
       .agg(arcf.arc_entropy_agg(column)).select(F.col(f"arc_entropyaggexpression({column}).{column}").alias(f"entropy"))
