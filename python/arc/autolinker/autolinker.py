@@ -114,7 +114,9 @@ class AutoLinker:
     else:
       cluster_groupby = F.lit(1)
     
-    df_entropy = data.groupBy(cluster_groupby).agg(arcf.arc_entropy_agg(column).select(F.col(f"arc_entropyaggexpression({column}).{column}").alias(f"entropy"))
+    df_entropy = data \
+      .groupBy(cluster_groupby) \
+      .agg(arcf.arc_entropy_agg(column).select(F.col(f"arc_entropyaggexpression({column}).{column}").alias(f"entropy")))
     
     mean_entropy = df_entropy.select(F.mean("entropy").alias("mean_entropy")).collect()[0]["mean_entropy"]
     
@@ -280,6 +282,7 @@ class AutoLinker:
     comparison_space = dict()
 
     # Create hyperopt space for comparisons
+    # TODO: make the threshold boundaries functions of the columns in some way
     for column in attribute_columns:
       comparison_space.update(
         {
@@ -563,6 +566,7 @@ class AutoLinker:
     training_rules = self._generate_rules(training_columns)
 
     # create settings dict
+    # TODO: make em_convergence not static?
     settings = {
       "retain_intermediate_calculation_columns": True,
       "retain_matching_columns": True,
