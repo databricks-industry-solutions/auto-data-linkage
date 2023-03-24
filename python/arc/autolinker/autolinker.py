@@ -768,7 +768,8 @@ class AutoLinker:
         unique_id=unique_id,
         deterministic_columns=self.deterministic_columns,
         training_columns=self.training_columns,
-        threshold=threshold
+        threshold=threshold,
+        true_label=true_label
       )
       
       loss = -evals["information_gain"]
