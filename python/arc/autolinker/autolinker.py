@@ -548,6 +548,8 @@ class AutoLinker:
 
     # Get blocking rules from hyperopt space
     blocking_rules_to_generate_predictions = space["blocking_rules"]
+    # TODO: remove this once fixed the other end
+    blocking_rules_to_generate_predictions = blocking_rules_to_generate_predictions.split(" OR ") if " OR " in blocking_rules_to_generate_predictions else [blocking_rules_to_generate_predictions]
     print(blocking_rules_to_generate_predictions)
     # Create comparison list from hyperopt space
     comparisons = self._create_comparison_list(space)
