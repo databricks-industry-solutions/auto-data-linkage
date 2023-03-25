@@ -60,9 +60,9 @@ trait ARC_EntropyAggBehaviors extends QueryTest {
             )
             .first()
 
-        result.getAs[Map[String, Double]]("entropies") must be(
+        result.getAs[Map[String, Double]]("entropies").mapValues(v => math.round(1000 * v)) must be(
           Map(
-            "a" -> (-3.0 / 8 * math.log(3 / 8.0) - 5.0 / 8.0 * math.log(5.0 / 8.0)),
+            "a" -> (-3.0 / 8 * math.log(3 / 8.0) - 5.0 / 8.0 * math.log(5.0 / 8.0)) / math.log(2),
             "b" -> (
               -3.0 / 8 * math.log(3.0 / 8.0)
                   - 2.0 / 8.0 * math.log(2.0 / 8.0)
@@ -84,7 +84,7 @@ trait ARC_EntropyAggBehaviors extends QueryTest {
                   - 2.0 / 8.0 * math.log(2.0 / 8.0)
                   - 2.0 / 8.0 * math.log(2.0 / 8.0)
             ) / math.log(6.0)
-          )
+          ).mapValues(v => math.round(1000 * v))
         )
     }
 
@@ -117,9 +117,7 @@ trait ARC_EntropyAggBehaviors extends QueryTest {
           columns
         )
 
-        val expectedCounter = (columns.map(k => k -> CountAccumulatorMap(Map.empty[String, Long])) ++ Seq(
-          "total" -> CountAccumulatorMap(Map.empty[String, Long])
-        )).toMap
+        val expectedCounter = columns.map(k => k -> CountAccumulatorMap(Map.empty[String, Long])).toMap
 
         expr.createAggregationBuffer().counter must be(expectedCounter)
 

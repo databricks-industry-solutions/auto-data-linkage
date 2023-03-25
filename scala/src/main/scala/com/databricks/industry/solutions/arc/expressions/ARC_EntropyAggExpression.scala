@@ -33,7 +33,7 @@ case class ARC_EntropyAggExpression(
 
     override def createAggregationBuffer(): EntropyCountAccumulatorMap =
         EntropyCountAccumulatorMap(
-          attributeMap.map(x => (x._1, CountAccumulatorMap())) + ("total" -> CountAccumulatorMap())
+          attributeMap.map(x => (x._1, CountAccumulatorMap()))
         )
 
     override def update(buffer: EntropyCountAccumulatorMap, input: InternalRow): EntropyCountAccumulatorMap = {
