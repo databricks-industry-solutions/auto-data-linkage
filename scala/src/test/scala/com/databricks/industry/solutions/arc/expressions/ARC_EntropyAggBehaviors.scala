@@ -109,12 +109,11 @@ trait ARC_EntropyAggBehaviors extends QueryTest {
 
         val expr = ARC_EntropyAggExpression(
           Seq(
-            BoundReference(0, StringType, nullable = true),
-            BoundReference(1, StringType, nullable = true),
-            BoundReference(2, StringType, nullable = true),
-            BoundReference(3, StringType, nullable = true)
-          ),
-          columns
+            "a" -> BoundReference(0, StringType, nullable = true),
+            "b" -> BoundReference(1, StringType, nullable = true),
+            "c" -> BoundReference(2, StringType, nullable = true),
+            "d" -> BoundReference(3, StringType, nullable = true)
+          ).toMap
         )
 
         val expectedCounter = columns.map(k => k -> CountAccumulatorMap(Map.empty[String, Long])).toMap

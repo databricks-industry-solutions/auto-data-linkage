@@ -12,22 +12,10 @@ import org.apache.spark.sql.types._
 import java.io.ByteArrayInputStream
 
 case class ARC_EntropyAggExpression(
-    attributeExprs: Seq[Expression],
-    attributeNames: Seq[String],
+    attributeMap: Map[String, Expression],
     mutableAggBufferOffset: Int = 0,
     inputAggBufferOffset: Int = 0
 ) extends TypedImperativeAggregate[EntropyCountAccumulatorMap] {
-
-    private val attributeMap = attributeNames.zip(attributeExprs).toMap
-
-    private def serializer: Kryo = {
-        val kryo = new Kryo()
-        kryo.register(classOf[scala.Tuple2[Any, Any]], new com.twitter.chill.Tuple2Serializer)
-        kryo.register(classOf[Array[(String, Long)]])
-        kryo.register(classOf[Array[(String, Array[(String, Long)])]])
-        kryo.register(classOf[EntropyCountNestedList])
-        kryo
-    }
 
     override def children: Seq[Expression] = attributeMap.values.toSeq
 
@@ -99,6 +87,18 @@ case class ARC_EntropyAggExpression(
 
     override def dataType: DataType = MapType(StringType, DoubleType)
 
-    override protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]): Expression = copy(attributeExprs = newChildren)
+    override protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]): Expression = {
+        val newAttributeMap = attributeMap.keys.zip(newChildren).toMap
+        copy(attributeMap = newAttributeMap)
+    }
+
+    private def serializer: Kryo = {
+        val kryo = new Kryo()
+        kryo.register(classOf[(Any, Any)], new com.twitter.chill.Tuple2Serializer)
+        kryo.register(classOf[Array[(String, Long)]])
+        kryo.register(classOf[Array[(String, Array[(String, Long)])]])
+        kryo.register(classOf[EntropyCountNestedList])
+        kryo
+    }
 
 }

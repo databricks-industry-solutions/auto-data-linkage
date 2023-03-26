@@ -23,8 +23,8 @@ object functions {
     }
 
     def arc_entropy_agg(cols: String*): Column = {
-        val exprs = cols.map(cn => new Column(cn).expr)
-        new Column(ARC_EntropyAggExpression(exprs, cols).toAggregateExpression())
+        val exprs = cols.map(cn => cn -> new Column(cn).expr).toMap
+        new Column(ARC_EntropyAggExpression(exprs).toAggregateExpression())
     }
 
     def arc_entropy_agg(cols: java.util.ArrayList[String]): Column = {
