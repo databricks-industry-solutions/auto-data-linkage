@@ -146,7 +146,9 @@ class AutoLinker:
     else:
       cluster_groupby = F.lit(1)
 
+
     entropy = data \
+      .fillna("null_") \
       .groupBy("cluster_id") \
       .agg(
         arcf.arc_entropy_agg(*attribute_columns).alias("ent_map")
@@ -575,7 +577,7 @@ class AutoLinker:
     blocking_rules_to_generate_predictions = space["blocking_rules"]
     # TODO: remove this once fixed the other end
     blocking_rules_to_generate_predictions = blocking_rules_to_generate_predictions.split(" OR ") if " OR " in blocking_rules_to_generate_predictions else [blocking_rules_to_generate_predictions]
-    print(blocking_rules_to_generate_predictions)
+    
     # Create comparison list from hyperopt space
     comparisons = self._create_comparison_list(space)
 
