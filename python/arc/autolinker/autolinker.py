@@ -265,8 +265,8 @@ class AutoLinker:
 
     accepted_rules = [rule.splink_rule for rule in rules]
 
-    # set deterministic rules to be 200th largest (or largest) blocking rule
-    self.deterministic_columns = df_rules.orderBy(F.col("rule_suared_count")).limit(200).orderBy(F.col("rule_squared_count").desc()).limit(1).collect()[0]["splink_rule"]
+    # set deterministic rules to be 500th largest (or largest) blocking rule
+    self.deterministic_columns = df_rules.orderBy(F.col("rule_squared_count")).limit(500).orderBy(F.col("rule_squared_count").desc()).limit(1).collect()[0]["splink_rule"]
 
           
     return accepted_rules
