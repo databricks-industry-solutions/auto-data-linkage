@@ -261,12 +261,12 @@ class AutoLinker:
     df_rules = arcf.arc_generate_blocking_rules(data, max_columns_per_and_rule, max_rules_per_or_rule, *attribute_columns)
 
     # Filter on max
-    rules = df_rules.filter(f"rule_squared_count > {comparison_size_limit}").orderBy("rule_squared_count").collect()
+    rules = df_rules.filter(f"rule_squared_count > {comparison_size_limit}").collect()
 
     accepted_rules = [rule.splink_rule for rule in rules]
 
-    # set deterministic rules to be largest available blocking rule
-    self.deterministic_columns = accepted_rules[-1]
+    # set deterministic rules to be 200th largest (or largest) blocking rule
+    self.deterministic_columns = df_rules.orderBy(F.col("rule_suared_count")).limit(200).orderBy(F.col("rule_squared_count").desc()).limit(1).collect()[0]["splink_rule"]
 
           
     return accepted_rules
