@@ -141,9 +141,27 @@ class AutoLinker:
     :param column: (valid) name of column to calculate entropy on
     :param by_cluster: if True, it will calculate the average entropy when the dataset is split by clusters.
     """
-    entropies = [self._calculate_column_entropy(data, column, by_cluster) for column in attribute_columns]
+    if by_cluster:
+      cluster_groupby = "cluster_id"
+    else:
+      cluster_groupby = F.lit(1)
+
+    entropy = data \
+      .groupBy("cluster_id") \
+      .agg(
+        arcf.arc_entropy_agg(*attribute_columns).alias("ent_map")
+      ) \
+      .withColumn("entropy", F.explode(F.map_values("ent_map"))) \
+      .groupBy(
+        cluster_groupby
+      ).agg(
+        F.sum("entropy").alias("entropy")
+      ) \
+      .select(F.avg("entropy").alias("mean_entropy"))
     
-    return np.mean(entropies)
+    entropy = entropy.collect()[0]["mean_entropy"]
+    
+    return entropy
   
 
   def _calculate_information_gain(
