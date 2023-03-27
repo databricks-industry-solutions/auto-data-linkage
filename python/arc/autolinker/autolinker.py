@@ -587,6 +587,7 @@ class AutoLinker:
 
     # deterministic_rules = self._generate_rules(deterministic_columns)
     deterministic_rules = self.deterministic_columns.split(" OR ") if " OR " in self.deterministic_columns else [self.deterministic_columns]
+    print(deterministic_rules)
     # if deterministic columns are not set, pick 2 at random from attribute columns
     # and save them as an attribute so that they can remain consistent between runs
     if not training_columns:
