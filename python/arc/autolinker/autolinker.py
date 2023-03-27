@@ -149,7 +149,7 @@ class AutoLinker:
 
     entropy = data \
       .fillna("null_") \
-      .groupBy("cluster_id") \
+      .groupBy(cluster_groupby) \
       .agg(
         arcf.arc_entropy_agg(*attribute_columns).alias("ent_map")
       ) \
