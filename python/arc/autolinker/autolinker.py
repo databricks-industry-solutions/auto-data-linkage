@@ -259,9 +259,13 @@ class AutoLinker:
     df_rules = arcf.arc_generate_blocking_rules(data, max_columns_per_and_rule, max_rules_per_or_rule, *attribute_columns)
 
     # Filter on max
-    rules = df_rules.filter(f"rule_squared_count > {comparison_size_limit}").collect()
+    rules = df_rules.filter(f"rule_squared_count > {comparison_size_limit}").orderBy("rule_squared_count").collect()
 
     accepted_rules = [rule.splink_rule for rule in rules]
+
+    # set deterministic rules to be largest available blocking rule
+    self.deterministic_columns = accepted_rules[-1]
+
           
     return accepted_rules
 
@@ -577,12 +581,12 @@ class AutoLinker:
 
     # if deterministic columns are not set, pick 2 at random from attribute columns
     # and save them as an attribute so that they can remain consistent between runs
-    if not self.deterministic_columns:
-      deterministic_columns = random.sample(attribute_columns, 2)
-      self.deterministic_columns = deterministic_columns
+    # if not self.deterministic_columns:
+    #   deterministic_columns = random.sample(attribute_columns, 2)
+    #   self.deterministic_columns = deterministic_columns
 
-    deterministic_rules = self._generate_rules(deterministic_columns)
-
+    # deterministic_rules = self._generate_rules(deterministic_columns)
+    deterministic_rules = self.deterministic_columns.split(" OR ") if " OR " in self.deterministic_columns else [self.deterministic_columns]
     # if deterministic columns are not set, pick 2 at random from attribute columns
     # and save them as an attribute so that they can remain consistent between runs
     if not training_columns:
