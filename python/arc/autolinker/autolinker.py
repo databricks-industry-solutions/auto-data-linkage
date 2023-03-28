@@ -750,7 +750,8 @@ class AutoLinker:
     deterministic_columns:list=None,
     training_columns:list=None,
     threshold:float=0.9,
-    true_label:str=None
+    true_label:str=None,
+    random_seed:int=42
   ) -> None:
     """
     Method to run a series of hyperopt trials.
@@ -819,7 +820,8 @@ class AutoLinker:
         space=space,
         algo=tpe.suggest,
         max_evals=max_evals,
-        trials=self.trials
+        trials=self.trials,
+        rstate=np.random.default_rng(random_seed)
       )
     
     best_param_for_rt = self._convert_hyperopt_to_splink()
