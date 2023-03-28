@@ -618,7 +618,7 @@ class AutoLinker:
     
     linker.initialise_settings(settings)
     # linker.estimate_probability_two_random_records_match(deterministic_rules, recall=0.8)
-    linker._settings_obj._probability_two_random_records_match = 1/(self.data_rowcount * self.data_rowcount)
+    linker._settings_obj._probability_two_random_records_match = 1/self.data_rowcount
     linker.estimate_u_using_random_sampling(target_rows=self.data_rowcount)
     for training_rule in training_rules:
       linker.estimate_parameters_using_expectation_maximisation(training_rule)
