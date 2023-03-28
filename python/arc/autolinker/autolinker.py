@@ -162,6 +162,9 @@ class AutoLinker:
       .select(F.avg("entropy").alias("mean_entropy"))
     
     entropy = entropy.collect()[0]["mean_entropy"]
+
+    if entropy is None:
+      entropy = 0.0
     
     return entropy
   
