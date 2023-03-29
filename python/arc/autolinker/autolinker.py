@@ -264,7 +264,7 @@ class AutoLinker:
     df_rules = arcf.arc_generate_blocking_rules(data, max_columns_per_and_rule, max_rules_per_or_rule, *attribute_columns)
 
     # Filter on max
-    rules = df_rules.filter(f"rule_squared_count > {comparison_size_limit}").collect()
+    rules = df_rules.filter(f"rule_squared_count < {comparison_size_limit}").collect()
 
     accepted_rules = [rule.splink_rule for rule in rules]
 
