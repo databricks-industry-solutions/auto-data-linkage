@@ -189,17 +189,23 @@ class AutoLinker:
     
     # Filter on rows which have a match
     df_matched = data.filter("_cluster_count>1")
+    df_unmatched = data.filter("_cluster_count=1")
+
+    entropy_whole_data = self._calculate_dataset_entropy(data, attribute_columns, by_cluster=False)
 
     # Calculate matched whole data entropy
     entropy_matched = self._calculate_dataset_entropy(df_matched, attribute_columns, by_cluster=False)
+    entropy_unmatched = self._calculate_dataset_entropy(df_unmatched, attribute_columns, by_cluster=False)
     
     # Calculate mean entropy by clusters
     entropy_cluster_mean = self._calculate_dataset_entropy(df_matched, attribute_columns, by_cluster=True)
     
     # Information gain: matched data entropy - mean entropy in each cluster
-    information_gain = entropy_matched - entropy_cluster_mean
+    information_gain1 = entropy_whole_data - (entropy_matched+entropy_unmatched)/2
+    impurity_divergence = entropy_unmatched - entropy_matched
+    information_gain2 = entropy_matched - entropy_cluster_mean
     
-    return information_gain
+    return information_gain1, impurity_divergence, information_gain2
 
 
     
@@ -660,7 +666,7 @@ class AutoLinker:
     df_clusters = clusters.as_spark_dataframe()
     
     # Calculate mean change in entropy
-    information_gain = self._calculate_information_gain(df_clusters, attribute_columns)
+    information_gain1, impurity_divergence, information_gain2 = self._calculate_information_gain(df_clusters, attribute_columns)
 
     # empirical scores      
     evals = dict()
@@ -672,7 +678,9 @@ class AutoLinker:
       for k, v in scores.items():
         evals.update({k:v})
 
-    evals["information_gain"] = information_gain
+    evals["information_gain1"] = information_gain1
+    evals["impurity_divergence"] = impurity_divergence
+    evals["information_gain2"] = information_gain2
 
 
     return evals
@@ -802,7 +810,7 @@ class AutoLinker:
         true_label=true_label
       )
       
-      loss = -evals["information_gain"]
+      loss = -evals["information_gain2"]
       
       result = {'loss': loss, 'status': STATUS_OK, 'run_id': run_id}
       for k, v in evals.items():
