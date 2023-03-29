@@ -6,9 +6,12 @@ import org.apache.spark.sql.QueryTest
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.BoundReference
 import org.apache.spark.sql.catalyst.util.MapData
+import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.StringType
 import org.apache.spark.unsafe.types.UTF8String
+import org.scalactic.Tolerance.convertNumericToPlusOrMinusWrapper
 import org.scalatest.matchers.must.Matchers.{be, convertToAnyMustWrapper, noException}
+import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
 
 trait ARC_EntropyAggBehaviors extends QueryTest {
 
@@ -89,6 +92,9 @@ trait ARC_EntropyAggBehaviors extends QueryTest {
     }
 
     def testExpressionMethods(): Unit = {
+
+        val sc = spark
+        import sc.implicits._
 
         val testData = spark
             .createDataFrame(
@@ -234,6 +240,68 @@ trait ARC_EntropyAggBehaviors extends QueryTest {
         )
 
         Math.round(1000 * expr.eval(longMap).asInstanceOf[MapData].valueArray().toDoubleArray().head) must be(623)
+
+        val counts = Seq(3, 1, 2, 2, 1, 5, 1, 2, 1, 1, 2, 2, 1, 1, 1, 1, 1, 13, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 4, 8, 1, 1, 2, 2, 3, 1, 4,
+          1, 3, 1, 9, 3, 10, 2, 3, 3, 1, 6, 1, 2, 2, 1, 2, 4, 1, 1, 2, 7, 4, 3, 18, 1, 1, 1, 1, 2, 6, 9, 5, 1, 1, 5, 2, 2, 12, 3, 1, 1, 1,
+          1, 1, 1, 1, 1, 1, 2, 2, 2, 1, 4, 3, 1, 2, 3, 2, 2, 2, 6, 2, 6, 1, 1, 1, 1, 8, 4, 2, 1, 1, 1, 8, 1, 1, 15, 4, 1, 1, 1, 2, 3, 4, 1,
+          4, 1, 2, 2, 2, 2, 1, 3, 8, 4, 5, 2, 1, 3, 1, 1, 8, 1, 2, 3, 1, 4, 1, 2, 1, 1, 1, 2, 9, 2, 8, 2, 5, 1, 1, 2, 1, 2, 5, 1, 1, 2, 3,
+          2, 1, 1, 6, 1, 2, 2, 6, 1, 7, 2, 1, 1, 5, 2, 3, 1, 4, 2, 2, 8, 6, 3, 5, 5, 2, 1, 1, 8, 11, 1, 2, 1, 13, 10, 2, 2, 4, 1, 1, 8, 1,
+          2, 2, 2, 2, 2, 3, 1, 1, 2, 2, 8, 8, 5, 2, 2, 1, 1, 1, 1, 4, 1, 1, 1, 2, 1, 2, 1, 1, 5, 1, 2, 1, 1, 1, 1, 1, 1, 7, 1, 1, 1, 1, 1,
+          1, 6, 3, 4, 1, 2, 1, 3, 3, 1, 1, 3, 1, 2, 1, 16, 1, 1, 2, 1, 4, 1, 1, 13, 8, 1, 1, 1, 3, 1, 2, 1, 1, 1, 7, 2, 1, 2, 2, 1, 1, 8, 2,
+          2, 11, 2, 6, 6, 2, 1, 1, 11, 8, 1, 5, 6, 1, 2, 3, 1, 1, 1, 3, 2, 5, 2, 1, 1, 1, 1, 6, 5, 5, 1, 1, 2, 3, 1, 1, 3, 1, 1, 1, 1, 2, 1,
+          4, 1, 1, 1, 1, 1, 1, 1, 7, 1, 2, 1, 1, 8, 9, 1, 5, 2, 1, 2, 1, 1, 1, 2, 2, 5, 1, 2, 1, 2, 9, 2, 2, 4, 1, 1, 8, 1, 2, 5, 4, 1, 16,
+          2, 3, 1, 2, 2, 1, 2, 2, 1, 2, 3, 2, 4, 7, 1, 11, 4, 1, 3, 6, 11, 4, 1, 2, 12, 1, 10, 1, 1, 1, 6, 3, 3, 1, 14, 2, 8, 1, 1, 4, 1, 2,
+          1, 6, 2, 1, 11, 2, 1, 1, 4, 1, 1, 1, 2, 1, 1, 5, 6, 9, 2, 2, 2, 1, 2, 1, 3, 2, 2, 1, 4, 2, 10, 2, 1, 10, 1, 1, 1, 2, 6, 1, 7, 7,
+          1, 7, 1, 2, 1, 15, 3, 1, 1, 1, 2, 1, 1, 7, 4, 1, 1, 8, 1, 1, 2, 5, 5, 3, 4, 6, 2, 1, 3, 2, 4, 1, 2, 3, 2, 1, 1, 3, 1, 1, 1, 1, 2,
+          1, 3, 2, 5, 2, 2, 1, 6, 1, 1, 4, 3, 1, 1, 13, 1, 3, 1, 2, 7, 4, 4, 3, 1, 1, 4, 2, 1, 2, 1, 1, 4, 1, 2, 1, 2, 1, 8, 1, 2, 2, 1, 1,
+          7, 1, 2, 2, 9, 7, 2, 3, 5, 4, 1, 1, 5, 1, 1, 2, 4, 6, 1, 2, 1, 11, 1, 1, 2, 1, 3, 6, 12, 2, 2, 1, 1, 4, 2, 1, 1, 5, 2, 1, 4, 13,
+          6, 2, 2, 1, 1, 11, 3, 2, 1, 8, 6, 1, 5, 3, 1, 1, 9, 4, 1, 1, 1, 1, 2, 4, 2, 1, 4, 1, 1, 15, 2, 2, 6, 1, 6, 12, 1, 21, 2, 2, 1, 3,
+          6, 1, 1, 1, 3, 1, 3, 4, 5, 1, 1, 2, 1, 1, 1, 7, 4, 2, 2, 2, 1, 1, 2, 22, 8, 3, 1, 6, 1, 1, 1, 7, 1, 1, 1, 1, 2, 3, 8, 1, 1, 2, 10,
+          13, 6, 11, 4, 1, 1, 2, 1, 1, 14, 2, 8, 10, 4, 1, 19, 1, 1, 1, 8, 8, 1, 1, 1, 2, 1, 1, 2, 6, 1, 7, 1, 2, 1, 1, 1, 9, 1, 1, 2, 1, 1,
+          3, 1, 3, 1, 14, 2, 10, 2, 1, 1, 1, 2, 6, 14, 5, 1, 1, 1, 5, 1, 3, 2, 2, 9, 1, 1, 5, 2, 2, 1, 1, 1, 5, 1, 8, 6, 2, 2, 1, 1, 4, 1,
+          2, 4, 3, 4, 1, 3, 2, 1, 2, 7, 14, 1, 7, 1, 8, 1, 2, 4, 1, 2, 2, 1, 1, 14, 9, 5, 7, 6, 9, 1, 1, 1, 1, 18, 2, 7, 4, 4, 6, 1, 2, 2,
+          2, 1, 1, 3, 1, 1, 1, 1, 2, 3, 5, 1, 5, 1, 2, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 5, 6, 1, 1, 2, 7, 2, 3, 1, 1, 1, 7,
+          4, 1, 1, 13, 1, 4, 3, 1, 1, 2, 1, 8, 7, 1, 1, 4, 12, 4, 9, 11, 2, 6, 1, 1, 3, 4, 2, 1, 8, 4, 3, 3, 9, 1, 2, 7, 4, 3, 1, 2, 4, 3,
+          1, 2, 3, 1, 2, 1, 6, 18, 6, 1, 6, 1, 1, 6, 4, 4, 4, 8, 7, 1, 2, 3, 4, 6, 1, 5, 1, 1, 4, 1, 3, 4, 3, 2, 3, 1, 1, 1, 5, 4, 1, 1, 2,
+          2, 1, 1, 1, 1)
+
+        val df = spark
+            .createDataFrame(Seq((1, counts)))
+            .toDF("id", "k")
+
+        val generateUDF = udf((n: Int) => {
+            (0 until n).toArray
+        })
+
+        val testData2 = df
+            .select(
+              explode(col("k")).alias("k")
+            )
+            .withColumn(
+              "id",
+              monotonically_increasing_id()
+            )
+            .withColumn(
+              "k",
+              generateUDF(col("k"))
+            )
+            .withColumn(
+              "k",
+              explode(col("k"))
+            )
+
+        val entropy = counts
+            .map(x => x.toDouble / counts.sum)
+            .map(x => -x * math.log(x))
+            .sum / math.log(counts.size)
+
+        testData2
+            .select(
+              arc_entropy_agg(counts.size, "id")
+            )
+            .as[Map[String, Double]]
+            .collect()
+            .head("id") should be(entropy +- 0.0001)
 
     }
 

@@ -1,6 +1,6 @@
 import warnings
-
 from typing import Union
+
 from pyspark import SparkContext
 from pyspark.sql import Column, DataFrame, SQLContext
 from pyspark.sql.column import _to_java_column
@@ -58,12 +58,14 @@ def arc_merge_count_map_agg(map_col: ColumnOrName) -> Column:
     return Column(jf(_to_java_column(map_col)))
 
 
-def arc_entropy_agg(*attributes: str) -> Column:
+def arc_entropy_agg(base: int, *attributes: str) -> Column:
     """
     Compute entropy of the provided attributes.
 
     Parameters
     ----------
+    base : int
+        Base of the logarithm to be used in the entropy calculation.
     attributes : *str
         Variable number of attributes to be used in the function.
 
@@ -73,7 +75,7 @@ def arc_entropy_agg(*attributes: str) -> Column:
 
     """
     jf = get_function("arc_entropy_agg")
-    return Column(jf(attributes))
+    return Column(jf(base, attributes))
 
 
 def arc_generate_blocking_rules(df, n, k, *attributes: str) -> DataFrame:

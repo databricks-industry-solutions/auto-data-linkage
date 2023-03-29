@@ -13,6 +13,7 @@ import java.io.ByteArrayInputStream
 
 case class ARC_EntropyAggExpression(
     attributeMap: Map[String, Expression],
+    base: Int = 0,
     mutableAggBufferOffset: Int = 0,
     inputAggBufferOffset: Int = 0
 ) extends TypedImperativeAggregate[EntropyCountAccumulatorMap] {
@@ -45,8 +46,12 @@ case class ARC_EntropyAggExpression(
     }
 
     def logDivisor(countMap: CountAccumulatorMap): Double = {
-        val total = countMap.counter.size
-        if (total < 2 | total == 10) 1.0 else math.log10(total)
+        if (base == 0) {
+            val total = countMap.counter.size
+            if (total < 2 | total == 10) 1.0 else math.log10(total)
+        } else {
+            math.log10(base)
+        }
     }
 
     override def eval(buffer: EntropyCountAccumulatorMap): Any = {
