@@ -1,3 +1,5 @@
+from typing import Tuple
+
 from pyspark.sql import functions as F
 from pyspark.sql.types import *
 from pyspark.sql import Window
@@ -174,7 +176,7 @@ class AutoLinker:
       self,
       clusters:pyspark.sql.DataFrame,
       attribute_columns:list
-      ) -> typing.Tuple[float]:
+      ) -> tuple[float, float, float, float, float, float, float, float, float, float]:
     """
     Method to calculate the information gain within clusters when the subset of the dataset that has been matched is split by clusters,
     i.e. entropy(matched data) - average(entropy(data within clusters)).
@@ -192,31 +194,38 @@ class AutoLinker:
     num_clusters = cluster_counts.filter("_cluster_count>1").count()
 
     # Filter on rows which have a match
-    df_matched = data.filter("_cluster_count>1")
-    df_unmatched = data.filter("_cluster_count=1")
+    df_matched = data.filter("_cluster_count>1").cache()
+    df_unmatched = data.filter("_cluster_count=1").cache()
+    k = int(data.count() / 2)
+    mk = df_matched.count()
+    uk = df_unmatched.count()
 
     entropy_whole_data_scaled = self._calculate_dataset_entropy(data, attribute_columns, by_cluster=False, base=num_clusters)
-    entropy_whole_data_static = self._calculate_dataset_entropy(data, attribute_columns, by_cluster=False, base=9999)
+    entropy_whole_data_static = self._calculate_dataset_entropy(data, attribute_columns, by_cluster=False, base=k)
 
     # Calculate matched whole data entropy
     entropy_matched_scaled = self._calculate_dataset_entropy(df_matched, attribute_columns, by_cluster=False, base=num_clusters)
-    entropy_matched_static = self._calculate_dataset_entropy(df_matched, attribute_columns, by_cluster=False, base=9999)
+    entropy_matched_static = self._calculate_dataset_entropy(df_matched, attribute_columns, by_cluster=False, base=k)
     entropy_unmatched_scaled = self._calculate_dataset_entropy(df_unmatched, attribute_columns, by_cluster=False, base=num_clusters)
-    entropy_unmatched_static = self._calculate_dataset_entropy(df_unmatched, attribute_columns, by_cluster=False, base=9999)
+    entropy_unmatched_static = self._calculate_dataset_entropy(df_unmatched, attribute_columns, by_cluster=False, base=k)
     
     # Calculate mean entropy by clusters
     entropy_cluster_mean_scaled = self._calculate_dataset_entropy(df_matched, attribute_columns, by_cluster=True, base=num_clusters)
-    entropy_cluster_mean_static = self._calculate_dataset_entropy(df_matched, attribute_columns, by_cluster=True, base=9999)
+    entropy_cluster_mean_static = self._calculate_dataset_entropy(df_matched, attribute_columns, by_cluster=True, base=k)
     
     # Information gain: matched data entropy - mean entropy in each cluster
     information_gain1_scaled = entropy_whole_data_scaled - (entropy_matched_scaled+entropy_unmatched_scaled)/2
     information_gain1_static = entropy_whole_data_static - (entropy_matched_static+entropy_unmatched_static)/2
+    information_gain1_scaled_2 = entropy_whole_data_scaled - (mk*entropy_matched_scaled+uk*entropy_unmatched_scaled)/(mk+uk)
+    information_gain1_static_2 = entropy_whole_data_static - (mk*entropy_matched_static+uk*entropy_unmatched_static)/(mk+uk)
     impurity_divergence_scaled = entropy_unmatched_scaled - entropy_matched_scaled
     impurity_divergence_static = entropy_unmatched_static - entropy_matched_static
     information_gain2_scaled = entropy_matched_scaled - entropy_cluster_mean_scaled
     information_gain2_static = entropy_matched_static - entropy_cluster_mean_static
+    information_gain3_scaled = entropy_whole_data_scaled - entropy_cluster_mean_scaled # ignore the intermediate step
+    information_gain3_static = entropy_whole_data_static - entropy_cluster_mean_static # ignore the intermediate step
     
-    return information_gain1_scaled, impurity_divergence_scaled, information_gain2_scaled, information_gain1_static, impurity_divergence_static, information_gain2_static
+    return information_gain1_scaled, impurity_divergence_scaled, information_gain2_scaled, information_gain1_static, impurity_divergence_static, information_gain2_static, information_gain1_scaled_2, information_gain1_static_2, information_gain3_scaled, information_gain3_static
 
 
     
@@ -677,7 +686,7 @@ class AutoLinker:
     df_clusters = clusters.as_spark_dataframe()
     
     # Calculate mean change in entropy
-    information_gain1_scaled, impurity_divergence_scaled, information_gain2_scaled, information_gain1_static, impurity_divergence_static, information_gain2_static = self._calculate_information_gain(df_clusters, attribute_columns)
+    information_gain1_scaled, impurity_divergence_scaled, information_gain2_scaled, information_gain1_static, impurity_divergence_static, information_gain2_static, information_gain1_scaled_2, information_gain1_static_2, information_gain3_scaled, information_gain3_static  = self._calculate_information_gain(df_clusters, attribute_columns)
 
     # empirical scores      
     evals = dict()
@@ -695,7 +704,10 @@ class AutoLinker:
     evals["information_gain1_static"] = information_gain1_static
     evals["impurity_divergence_static"] = impurity_divergence_static
     evals["information_gain2_static"] = information_gain2_static
-
+    evals["information_gain1_scaled_2"] = information_gain1_scaled_2
+    evals["information_gain1_static_2"] = information_gain1_static_2
+    evals["information_gain3_scaled"] = information_gain3_scaled
+    evals["information_gain3_static"] = information_gain3_static
 
     return evals
   
