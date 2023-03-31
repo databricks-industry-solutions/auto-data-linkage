@@ -176,7 +176,7 @@ class AutoLinker:
       self,
       clusters:pyspark.sql.DataFrame,
       attribute_columns:list
-      ) -> tuple[float]:
+      ) -> typing.Tuple[float, float, float, float, float, float, float, float, float, float]:
     """
     Method to calculate the information gain within clusters when the subset of the dataset that has been matched is split by clusters,
     i.e. entropy(matched data) - average(entropy(data within clusters)).
