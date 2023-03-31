@@ -1,3 +1,4 @@
+import uuid
 from typing import Tuple
 
 from pyspark.sql import functions as F
@@ -71,7 +72,8 @@ class AutoLinker:
     schema:str=None,
     experiment_name:str=None,
     training_columns:list=None,
-    deterministic_columns:list=None
+    deterministic_columns:list=None,
+    table_name_prefix:str=None
   ) -> None:
     """
     Initialises an AutoLinker instance to perform automated record linking.
@@ -87,6 +89,7 @@ class AutoLinker:
     self.best_params = None
     self.clusters=None
     self.cluster_threshold=None
+    self.table_name_prefix = table_name_prefix
     self.original_entropies = dict()
 
 
@@ -684,6 +687,7 @@ class AutoLinker:
      # Cluster records that are matched above threshold
     clusters = linker.cluster_pairwise_predictions_at_threshold(predictions, threshold_match_probability=threshold)
     df_clusters = clusters.as_spark_dataframe()
+    df_clusters.write.mode("overwrite").saveAsTable(f"{self.table_name_prefix}_clusters_{uuid.uuid4()}")
     
     # Calculate mean change in entropy
     information_gain1_scaled, impurity_divergence_scaled, information_gain2_scaled, information_gain1_static, impurity_divergence_static, information_gain2_static, information_gain1_scaled_2, information_gain1_static_2, information_gain3_scaled, information_gain3_static  = self._calculate_information_gain(df_clusters, attribute_columns)
@@ -693,6 +697,7 @@ class AutoLinker:
 
     if true_label:
       df_predictions = predictions.as_spark_dataframe()
+      df_predictions.write.mode("overwrite").saveAsTable(f"{self.table_name_prefix}_predictions_{uuid.uuid4()}")
       scores = self.get_confusion_metrics(data, df_predictions, threshold, unique_id, true_label)
 
       for k, v in scores.items():
