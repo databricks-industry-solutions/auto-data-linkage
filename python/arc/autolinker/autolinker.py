@@ -25,6 +25,10 @@ import math
 import random
 from datetime import datetime
 
+from sklearn.metrics import (adjusted_mutual_info_score, adjusted_rand_score,
+                             completeness_score, fowlkes_mallows_score, homogeneity_score, 
+                             mutual_info_score, normalized_mutual_info_score, rand_score, v_measure_score)
+
 import typing
 
 import mlflow
@@ -679,10 +683,11 @@ class AutoLinker:
     # Calculate mean change in entropy
     information_gain1_scaled, impurity_divergence_scaled, information_gain2_scaled, information_gain1_static, impurity_divergence_static, information_gain2_static = self._calculate_information_gain(df_clusters, attribute_columns)
 
-    # empirical scores      
-    evals = dict()
+    # empirical scores
 
     if true_label:
+      evals = self.get_clustering_metrics(df_clusters, true_label)
+
       df_predictions = predictions.as_spark_dataframe()
       scores = self.get_confusion_metrics(data, df_predictions, threshold, unique_id, true_label)
 
@@ -1070,3 +1075,28 @@ class AutoLinker:
       }
 
     return scores
+  
+  def get_clustering_metrics(self, clusters, true_label):
+    win = Window.partitionBy("soc_sec_id")
+    win2 = Window.partitionBy("cluster_id")
+
+    pdf_clusters = clusters \
+      .withColumn("cnt", F.count("*").over(win))\
+      .withColumn(true_label, F.when(F.col("cnt") == 1, F.lit(-1)).otherwise(F.col(true_label)))\
+      .withColumn("cnt", F.count("*").over(win2))\
+      .withColumn("cluster_id", F.when(F.col("cnt") == 1, F.lit(-1)).otherwise(F.col("cluster_id")))\
+      .toPandas()
+
+    cluster_scores = {
+      "adjusted_mutual_info_score": adjusted_mutual_info_score(pdf_clusters[true_label], pdf_clusters["cluster_id"]),
+      "adjusted_rand_score": adjusted_rand_score(pdf_clusters[true_label], pdf_clusters["cluster_id"]),
+      "completeness_score": completeness_score(pdf_clusters[true_label], pdf_clusters["cluster_id"]),
+      "fowlkes_mallows_score": fowlkes_mallows_score(pdf_clusters[true_label], pdf_clusters["cluster_id"]),
+      "homogeneity_score": homogeneity_score(pdf_clusters[true_label], pdf_clusters["cluster_id"]),
+      "mutual_info_score": mutual_info_score(pdf_clusters[true_label], pdf_clusters["cluster_id"]),
+      "normalized_mutual_info_score": normalized_mutual_info_score(pdf_clusters[true_label], pdf_clusters["cluster_id"]),
+      "rand_score": rand_score(pdf_clusters[true_label], pdf_clusters["cluster_id"]),
+      "v_measure_score": v_measure_score(pdf_clusters[true_label], pdf_clusters["cluster_id"]),
+    }
+
+    return cluster_scores
