@@ -1077,7 +1077,7 @@ class AutoLinker:
     return scores
   
   def get_clustering_metrics(self, clusters, true_label):
-    win = Window.partitionBy("soc_sec_id")
+    win = Window.partitionBy(true_label)
     win2 = Window.partitionBy("cluster_id")
 
     pdf_clusters = clusters \
