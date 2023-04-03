@@ -651,6 +651,7 @@ class AutoLinker:
     }
     
     #suppress prints
+    saved_stdout = sys.stdout
     sys.stdout = open(os.devnull, 'w')
 
     # Train linker model
@@ -667,9 +668,9 @@ class AutoLinker:
     predictions = linker.predict()
 
     #enable prints
-    sys.stdout = sys.__stdout__
+    sys.stdout = saved_stdout
 
-    
+
     return linker, predictions
   
   
