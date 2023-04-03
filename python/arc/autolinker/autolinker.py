@@ -168,7 +168,8 @@ class AutoLinker:
   def _calculate_unsupervised_metrics(
       self,
       clusters:pyspark.sql.DataFrame,
-      attribute_columns:list
+      attribute_columns:list,
+      base:int
       ) -> typing.Tuple[float]:
     """
     Method to calculate the information gain within clusters when the subset of the dataset that has been matched is split by clusters,
@@ -179,8 +180,6 @@ class AutoLinker:
     :param clusters: dataframe returned from linker clustering
     :param attribute_columns: list of valid column names containing attributes in the clusters dataset
     """
-    # get adjusted base
-    k = max([data.groupBy(cn).count().count() for cn in attribute_columns])
 
     # Calculate count of rows in each cluster and rejoin
     cluster_counts = clusters.groupBy("cluster_id").count().withColumnRenamed("count", "_cluster_count")
@@ -195,20 +194,20 @@ class AutoLinker:
 
     entropy_whole_data_scaled = self._calculate_dataset_entropy(data, attribute_columns, by_cluster=False, base=num_clusters)
     entropy_whole_data_static = self._calculate_dataset_entropy(data, attribute_columns, by_cluster=False, base=9999)
-    entropy_whole_data_adjusted = self._calculate_dataset_entropy(data, attribute_columns, by_cluster=False, base=k)
+    entropy_whole_data_adjusted = self._calculate_dataset_entropy(data, attribute_columns, by_cluster=False, base=base)
 
     # Calculate matched whole data entropy
     entropy_matched_scaled = self._calculate_dataset_entropy(df_matched, attribute_columns, by_cluster=False, base=num_clusters)
     entropy_matched_static = self._calculate_dataset_entropy(df_matched, attribute_columns, by_cluster=False, base=9999)
-    entropy_matched_adjusted = self._calculate_dataset_entropy(df_matched, attribute_columns, by_cluster=False, base=k)
+    entropy_matched_adjusted = self._calculate_dataset_entropy(df_matched, attribute_columns, by_cluster=False, base=base)
     entropy_unmatched_scaled = self._calculate_dataset_entropy(df_unmatched, attribute_columns, by_cluster=False, base=num_clusters)
     entropy_unmatched_static = self._calculate_dataset_entropy(df_unmatched, attribute_columns, by_cluster=False, base=9999)
-    entropy_unmatched_adjusted = self._calculate_dataset_entropy(df_unmatched, attribute_columns, by_cluster=False, base=k)
+    entropy_unmatched_adjusted = self._calculate_dataset_entropy(df_unmatched, attribute_columns, by_cluster=False, base=base)
     
     # Calculate mean entropy by clusters
     entropy_cluster_mean_scaled = self._calculate_dataset_entropy(df_matched, attribute_columns, by_cluster=True, base=num_clusters)
     entropy_cluster_mean_static = self._calculate_dataset_entropy(df_matched, attribute_columns, by_cluster=True, base=9999)
-    entropy_cluster_mean_adjusted = self._calculate_dataset_entropy(df_matched, attribute_columns, by_cluster=True, base=k)
+    entropy_cluster_mean_adjusted = self._calculate_dataset_entropy(df_matched, attribute_columns, by_cluster=True, base=base)
     
     # Information gain: matched data entropy - mean entropy in each cluster
     # IG1
@@ -701,11 +700,13 @@ class AutoLinker:
 
     
      # Cluster records that are matched above threshold
+    # get adjusted base
+    k = max([data.groupBy(cn).count().count() for cn in attribute_columns])
     clusters = linker.cluster_pairwise_predictions_at_threshold(predictions, threshold_match_probability=threshold)
     df_clusters = clusters.as_spark_dataframe()
     
     # Calculate mean change in entropy
-    evals = self._calculate_unsupervised_metrics(df_clusters, attribute_columns)
+    evals = self._calculate_unsupervised_metrics(df_clusters, attribute_columns, base=k)
 
     # empirical scores
 
