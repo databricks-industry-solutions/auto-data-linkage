@@ -24,6 +24,8 @@ import itertools
 import math
 import random
 from datetime import datetime
+import sys
+import os
 
 from sklearn.metrics import (adjusted_mutual_info_score, adjusted_rand_score,
                              completeness_score, fowlkes_mallows_score, homogeneity_score, 
@@ -648,6 +650,9 @@ class AutoLinker:
       "blocking_rules_to_generate_predictions": blocking_rules_to_generate_predictions
     }
     
+    #suppress prints
+    sys.stdout = open(os.devnull, 'w')
+
     # Train linker model
     linker = SparkLinker(data, spark=self.spark, database=self.schema, catalog=self.catalog)
     
@@ -661,6 +666,10 @@ class AutoLinker:
     # Make predictions
     predictions = linker.predict()
 
+    #enable prints
+    sys.stdout = sys.__stdout__
+
+    
     return linker, predictions
   
   
