@@ -218,6 +218,10 @@ class AutoLinker:
     impurity_divergence_scaled = np.sum([entropy_unmatched_scaled[c] - entropy_matched_scaled[c] for c in attribute_columns])
     impurity_divergence_static = np.sum([entropy_unmatched_static[c] - entropy_matched_static[c] for c in attribute_columns])
     impurity_divergence_adjusted = np.sum([entropy_unmatched_adjusted[c] - entropy_matched_adjusted[c] for c in attribute_columns])
+    impurity_divergence_scaled_abs = abs(np.sum([entropy_unmatched_scaled[c] - entropy_matched_scaled[c] for c in attribute_columns]))
+    impurity_divergence_static_abs = abs(np.sum([entropy_unmatched_static[c] - entropy_matched_static[c] for c in attribute_columns]))
+    impurity_divergence_adjusted_abs = abs(np.sum([entropy_unmatched_adjusted[c] - entropy_matched_adjusted[c] for c in attribute_columns]))
+
     # IG2
     information_gain2_scaled = np.sum([entropy_matched_scaled[c] - entropy_cluster_mean_scaled[c] for c in attribute_columns])
     information_gain2_static = np.sum([entropy_matched_static[c] - entropy_cluster_mean_static[c] for c in attribute_columns])
@@ -230,6 +234,9 @@ class AutoLinker:
       "impurity_divergence_scaled": impurity_divergence_scaled,
       "impurity_divergence_static": impurity_divergence_static,
       "impurity_divergence_adjusted": impurity_divergence_adjusted,
+      "impurity_divergence_scaled_abs": impurity_divergence_scaled_abs,
+      "impurity_divergence_static_abs": impurity_divergence_static_abs,
+      "impurity_divergence_adjusted_abs": impurity_divergence_adjusted_abs,
       "information_gain2_scaled": information_gain2_scaled,
       "information_gain2_static": information_gain2_static,
       "information_gain2_adjusted": information_gain2_adjusted,
