@@ -280,7 +280,6 @@ class AutoLinker:
     data:pyspark.sql.DataFrame,
     attribute_columns:list,
     comparison_size_limit:int,
-    unique_id:str,
     max_columns_per_and_rule:int=2,
     max_rules_per_or_rule:int=3
   ) -> dict:
@@ -304,7 +303,6 @@ class AutoLinker:
       data=data,
       attribute_columns=attribute_columns,
       comparison_size_limit=comparison_size_limit,
-      unique_id=unique_id,
       max_columns_per_and_rule=max_columns_per_and_rule,
       max_rules_per_or_rule=max_rules_per_or_rule
     )
