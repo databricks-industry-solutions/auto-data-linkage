@@ -8,24 +8,18 @@ from arc.sql import functions as arcf
 
 import splink
 from splink.spark.spark_linker import SparkLinker
-from splink.databricks.enable_splink import enable_splink
 import splink.spark.spark_comparison_library as cl
 
 import hyperopt
-from hyperopt import fmin, tpe, hp, SparkTrials, STATUS_OK, Trials
-from hyperopt.pyll import scope
+from hyperopt import fmin, tpe, hp, STATUS_OK, Trials
 
 from . import splink_mlflow
 
-import pandas as pd
 import numpy as np
-import scipy.stats as ss
-import itertools
 import math
 import random
 from datetime import datetime
-import sys
-import os
+
 
 from sklearn.metrics import (adjusted_mutual_info_score, adjusted_rand_score,
                              completeness_score, fowlkes_mallows_score, homogeneity_score, 
