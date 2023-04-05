@@ -81,11 +81,10 @@ class AutoLinker:
     Initialises an AutoLinker instance to perform automated record linking.
     """
     self.spark = spark 
-    self.catalog = catalog# if catalog else spark.catalog.currentCatalog()
-    self.schema = schema  #. if schema else spark.catalog.currentDatabase()
+    self.catalog = catalog
+    self.schema = schema
     
-    #self.username = spark.sql('select current_user() as user').collect()[0]['user']
-    self.experiment_name = experiment_name #if experiment_name else f"/Users/{self.username}/Databricks Autolinker {str(datetime.now())}"
+    self.experiment_name = experiment_name
     self.training_columns = training_columns
     self.deterministic_columns = deterministic_columns
     self.best_params = None
@@ -104,15 +103,17 @@ class AutoLinker:
       attribute_columns:list,
       by_cluster:bool=False,
       base:int=0
-      ) -> float:
+      ) -> dict:
     """
-    Method to calculate the average entropy of each attribute column in a dataset.
+    Method to calculate the average entropy of each attribute column in a dataset. Uses the custom arc_entropy_agg
+    function from ARC's SQL built-ins to efficiently calculate entropy across all columns.
 
-    Returns a float.
+    Returns a dictionary with keys as columns and values as entropy in the columns.
 
     :param data: input dataframe with row per record
     :param column: (valid) name of column to calculate entropy on
     :param by_cluster: if True, it will calculate the average entropy when the dataset is split by clusters.
+    :param base: base of the log in the entropy calculation
     """
     if by_cluster:
       cluster_groupby = "cluster_id"
@@ -136,15 +137,44 @@ class AutoLinker:
       clusters:pyspark.sql.DataFrame,
       attribute_columns:list,
       base:int
-      ) -> typing.Tuple[float]:
+      ) -> dict:
     """
-    Method to calculate the information gain within clusters when the subset of the dataset that has been matched is split by clusters,
-    i.e. entropy(matched data) - average(entropy(data within clusters)).
+    Method to calculate the chosen metric for unsupervised optimisation, the power ratio of information gains when
+    calculated using a base of the number of clusters and a base of the maximum number of unique values in any 
+    columns in the original data. Information gain is defined as the difference in average entropy of clustered
+    records when split and the entropy of the data points that are being matched.
 
-    Returns information gain metric, as float.
+    Let the number of clusters in the matched subset of the data be :math:`c`
+
+    Let the maximum number of unique values in any column in the original dataset be :math:`u`
+
+    Then the "scaled" entropy of column :math:`k`, :math:`N` unique values with probability :math:`P` is
+
+    :math:`E_{s,k} = -\Sigma_{i}^{N} P_{i} \log_{c}(P_{i})`
+
+    Then the "adjusted" entropy of column :math:`k`, :math:`N` unique values with probability :math:`P` is
+
+    :math:`E_{a,k} = -\Sigma_{i}^{N} P_{i} \log_{u}(P_{i})`
+
+    The scaled information gain is
+
+    :math:`I_{s} = \Sigma_{k}^{K} E_{s,k} - E'_{s,k}`
+
+    and the adjusted information gain is
+
+    :math:`I_{a} = \Sigma_{k}^{K} E_{a,k} - E'_{a,k}`
+
+    where :math:`E'` is the mean entropy of the individual clusters predicted.
+
+    The metric to optimise for is:
+
+    :math:`I_{s}^{I_{a}}`
+
+    Returns information gain metric, as dictionary.
 
     :param clusters: dataframe returned from linker clustering
     :param attribute_columns: list of valid column names containing attributes in the clusters dataset
+    :param base: the base for the log when calculating the adjusted entropy
     """
 
     # Calculate count of rows in each cluster and rejoin
@@ -156,7 +186,6 @@ class AutoLinker:
 
     # Filter on rows which have a match
     df_matched = data.filter("_cluster_count>1")
-    df_unmatched = data.filter("_cluster_count=1")
 
     # Calculate matched whole data entropy
     entropy_matched_scaled = self._calculate_dataset_entropy(df_matched, attribute_columns, by_cluster=False, base=num_clusters)
@@ -216,20 +245,18 @@ class AutoLinker:
     data:pyspark.sql.DataFrame,
     attribute_columns:list,
     comparison_size_limit:int,
-    unique_id:str,
     max_columns_per_and_rule:int=2,
     max_rules_per_or_rule:int=3,
   ) -> list:
     """
     Method to automatically generate a list of lists of blocking rules to test, given a user-defined limit for
-    pair-wise comparison size.
+    pair-wise comparison size. Uses appriximated method built in to ARC's SQL functions.
 
     Returns a nested list of lists with Splink-compatible blocking rule queries.
 
     :param data: input data with record-per-row
     :param attribute_columns: valid column names of data, containing all possible columns to block on
     :param comparison_size_limit: the maximum number of pairs we want to compare, to limit hardware issues
-    :param unique_id: the name of the unique ID column in data
     :param max_columns_per_and_rule: the maximum number of column comparisons in a single rule to try
     :param max_rules_per_or_rule: the maximum number of rules comparisons in a composite rule to try
 
@@ -376,53 +403,6 @@ class AutoLinker:
     return data
   
 
-
-  def _convert_hyperopt_to_splink(self) -> dict:
-    """
-    Method to convert hyperopt trials to a dictionary that can be used to
-    train a linker model. Used for training the best linker model at the end of an experiment.
-    Sets class attributes for best metric and parameters as well.
-
-    Returns a dictionary.
-
-    """
-    # Set best params, metrics and results
-    t = self.trials.best_trial
-    self.best_metric = t['result']['loss']
-    params = t['misc']['vals']
-    blocking_rules = t['misc']['vals']['blocking_rules'][0]
-    comparison_params = {}
-
-    for k, v in params.items():
-      if ("threshold" in k) & (len(v)>0):
-        column, function, _ = k.split('|')
-        comparison_params.update({
-          column: {
-            "function": function,
-            "threshold": v[0]
-          }
-        })
-
-    self.best_params = {
-      "blocking_rules": self.blocking_rules[blocking_rules],
-      "comparisons": comparison_params
-    }
-
-    best_comparisons = {}
-    for k, v in comparison_params.items():
-      best_comparisons.update({
-        k: {"distance_function": {"distance_function": v['function'], "threshold": v['threshold']}}
-      })
-      
-    best_params_for_rt = {
-      "blocking_rules": self.best_params['blocking_rules'],
-      "comparisons": best_comparisons
-    }
-
-    return best_params_for_rt
-
-
-    
   def _create_comparison_list(
     self,
     space:dict
@@ -493,7 +473,6 @@ class AutoLinker:
     space:dict,
     attribute_columns:list,
     unique_id:str,
-    deterministic_columns:list=None,
     training_columns:list=None
     ) -> typing.Tuple[splink.spark.spark_linker.SparkLinker, splink.splink_dataframe.SplinkDataFrame]:
     """
@@ -505,7 +484,6 @@ class AutoLinker:
     :param space: dictionary generated by hyperopt sampling
     :param attribute_columns: list of strings containing all attribute columns
     :param unique_id: string with the name of the unique ID column
-    :param deterministic columns: list of strings containint columns to block on
     :param training_columns: list of strings containing training columns
     
     """
@@ -518,19 +496,12 @@ class AutoLinker:
 
     # Get blocking rules from hyperopt space
     blocking_rules_to_generate_predictions = space["blocking_rules"]
-    # TODO: remove this once fixed the other end
+    # TODO: separate out to own method?
     blocking_rules_to_generate_predictions = blocking_rules_to_generate_predictions.split(" OR ") if " OR " in blocking_rules_to_generate_predictions else [blocking_rules_to_generate_predictions]
     
     # Create comparison list from hyperopt space
     comparisons = self._create_comparison_list(space)
 
-    # if deterministic columns are not set, pick 2 at random from attribute columns
-    # and save them as an attribute so that they can remain consistent between runs
-    # if not self.deterministic_columns:
-    #   deterministic_columns = random.sample(attribute_columns, 2)
-    #   self.deterministic_columns = deterministic_columns
-
-    # deterministic_rules = self._generate_rules(deterministic_columns)
     deterministic_rules = self.deterministic_columns.split(" OR ") if " OR " in self.deterministic_columns else [self.deterministic_columns]
     print(deterministic_rules)
     # if deterministic columns are not set, pick 2 at random from attribute columns
@@ -552,16 +523,11 @@ class AutoLinker:
       "em_convergence": 0.01,
       "blocking_rules_to_generate_predictions": blocking_rules_to_generate_predictions
     }
-    
-    #suppress prints
-    saved_stdout = sys.stdout
-    sys.stdout = open(os.devnull, 'w')
 
     # Train linker model
     linker = SparkLinker(data, spark=self.spark, database=self.schema, catalog=self.catalog)
     
-    linker.initialise_settings(settings)
-    # linker.estimate_probability_two_random_records_match(deterministic_rules, recall=0.8)
+    linker.load_settings(settings)
     linker._settings_obj._probability_two_random_records_match = 1/self.data_rowcount
     linker.estimate_u_using_random_sampling(target_rows=self.data_rowcount)
     for training_rule in training_rules:
@@ -569,9 +535,6 @@ class AutoLinker:
 
     # Make predictions
     predictions = linker.predict()
-
-    #enable prints
-    sys.stdout = saved_stdout
 
 
     return linker, predictions
@@ -594,16 +557,16 @@ class AutoLinker:
     Returns a dictionary of evaluation metrics.
 
     :param data: Spark Dataframe containing the original dataset (required to establish ground truth labels)
-    :param df_predictions: Spark DataFrame containing pair-wise predictions made by a linker model
+    :param predictions: Splink DataFrame as a result of calling linker.predict()
     :param threshold: float indicating the probability threshold above which a pair is considered a match
     :param attribute_columns: list of strings with valid column names to compare the entropies of
+    :param unique_id: string with the name of the unique ID column
     :param linker: isntance of splink.SparkLinker, used for deduplication (clustering)
     :param true_label: The name of the column with true record ids, if exists (default None) - if not None, auto_link will attempt to calculate empirical scores
 
     """
-
     
-     # Cluster records that are matched above threshold
+    # Cluster records that are matched above threshold
     # get adjusted base
     k = max([data.groupBy(cn).count().count() for cn in attribute_columns])
     clusters = linker.cluster_pairwise_predictions_at_threshold(predictions, threshold_match_probability=threshold)
@@ -613,7 +576,6 @@ class AutoLinker:
     evals = self._calculate_unsupervised_metrics(df_clusters, attribute_columns, base=k)
 
     # empirical scores
-
     if true_label:
       cluster_metrics = self.get_clustering_metrics(df_clusters, true_label)
       for k, v in cluster_metrics.items():
@@ -699,8 +661,6 @@ class AutoLinker:
     comparison_size_limit:int,
     max_evals:int,
     cleaning="all",
-    deterministic_columns:list=None,
-    training_columns:list=None,
     threshold:float=0.9,
     true_label:str=None,
     random_seed:int=42,
@@ -717,11 +677,9 @@ class AutoLinker:
     :param comparison_size_limit: int denoting maximum size of pairs allowed after blocking
     :param max_evals: int denoting max number of hyperopt trials to run
     :param cleaning: string ("all" or "none") or dictionary with keys as column names and values as list of strings for methods (accepted are "lower" and "alphanumeric_only")
-    :param deterministic columns: list of strings containint columns to block on - if None, they will be generated automatically/randomly
-    :param training_columns: list of strings containing training columns - if None, they will be generated automatically/randomly
     :param threshold: float indicating the probability threshold above which a pair is considered a match
     :param true_label: The name of the column with true record ids, if exists (default None) - if not None, auto_link will attempt to calculate empirical scores
-    
+    :param random_seed: Seed for Hyperopt fmin
     """
     
     # extract spark from input data
@@ -776,12 +734,8 @@ class AutoLinker:
         trials=self.trials,
         rstate=np.random.default_rng(random_seed)
       )
-    
-    best_param_for_rt = self._convert_hyperopt_to_splink()
-    
-    
+        
     self.best_run_id = self.trials.best_trial["result"]["run_id"]
-    self.best_linker, self.best_predictions_df = self.train_linker(data, best_param_for_rt, attribute_columns, unique_id, self.deterministic_columns, self.training_columns)
         
     
     # return succes text
@@ -789,26 +743,12 @@ class AutoLinker:
     ======================================================================================
                                       AutoLinking completed.
     ======================================================================================
-    Deterministic rules used
-    ------------------------
-    {', '.join(self._generate_rules(self.deterministic_columns))}
-    ------------------------
-    Training rules used
-    ------------------------
-    {', '.join(self._generate_rules(self.training_columns))}
-    ------------------------
-    Best parameters
-    ------------------------
-    {self.best_params}
-    ------------------------
-    Best Metric: {self.best_metric}
-    ------------------------
-    You can now access the best linker model and predictions and use Splink's built-in functionality, e.g.:
-    
-    >>> linker = arc.best_linker
-    >>> predictions = arc.best_predictions()
-    >>> ...
+
+    You can now access the best model with
+    >>> best_model = autolinker.get_best_splink_model()
+
     """
+
     print(success_text)
     
     return None
@@ -825,20 +765,21 @@ class AutoLinker:
     unwrapped_model = loaded_model.unwrap_python_model()
     return unwrapped_model
   
+
   def best_predictions(self):
     """
     Get the predictions from the best linker model trained.
-    Returns
-    -------
-    A spark dataframe of the pairwise predictions made by the autolinker model.
+    Returns a spark dataframe of the pairwise predictions made by the autolinker model.
     """
     return self.best_predictions_df.as_spark_dataframe()
   
+
   def _do_clustering(self):
     #factor out the clustering call as used multiple times
     clusters = self.best_linker.cluster_pairwise_predictions_at_threshold(self.best_predictions_df, self.cluster_threshold)
     self.clusters = clusters
   
+
   def best_clusters_at_threshold(
     self,
     threshold:float=0.8
@@ -866,63 +807,65 @@ class AutoLinker:
         self._do_clustering()
     return self.clusters.as_spark_dataframe()
         
-  
-  def cluster_viewer(self):
-    """
-    Produce an interactive dashboard for visualising clusters. It provides examples of clusters of different sizes.
-    The shape and size of clusters can be indicative of problems with record linkage, so it provides a tool to help you
-    find potential false positive and negative links.
-    See this video for an indepth explanation of interpreting this dashboard: https://www.youtube.com/watch?v=DNvCMqjipis
+  ## TODO: temporarily disabled because Sphinx doesn't play with displayHTML()  
+  # def cluster_viewer(self):
+  #   """
+  #   Produce an interactive dashboard for visualising clusters. It provides examples of clusters of different sizes.
+  #   The shape and size of clusters can be indicative of problems with record linkage, so it provides a tool to help you
+  #   find potential false positive and negative links.
+  #   See this video for an indepth explanation of interpreting this dashboard: https://www.youtube.com/watch?v=DNvCMqjipis
 
-    Writes a HTML file to DBFS at "/dbfs/Users/{username}/scv.html"
+  #   Writes a HTML file to DBFS at "/dbfs/Users/{username}/scv.html"
 
-    """
-    # do clustering if not already done and no clusters provided
-    if not self.clusters:
-      raise ValueError("Pairs have not yet been clustered. Please run best_clusters_at_threshold() with an optional"
-                       "threshold argument to generate clusters. ")
+  #   """
+  #   # do clustering if not already done and no clusters provided
+  #   if not self.clusters:
+  #     raise ValueError("Pairs have not yet been clustered. Please run best_clusters_at_threshold() with an optional"
+  #                      "threshold argument to generate clusters. ")
       
-    path=f"/Users/{self.username}/clusters.html"
-    self.best_linker.cluster_studio_dashboard(self.best_predictions_df, self.clusters, path, sampling_method="by_cluster_size", overwrite=True)
+  #   path=f"/Users/{self.username}/clusters.html"
+  #   self.best_linker.cluster_studio_dashboard(self.best_predictions_df, self.clusters, path, sampling_method="by_cluster_size", overwrite=True)
     
-    # splink automatically prepends /dbfs to the output path
-    with open("/dbfs" + path, "r") as f:
-        html2=f.read()
+  #   # splink automatically prepends /dbfs to the output path
+  #   with open("/dbfs" + path, "r") as f:
+  #       html2=f.read()
     
-    ## TODO: this method currently breaks Sphinx, need to investigate
-    displayHTML(html2)
+  #   ## TODO: this method currently breaks Sphinx, need to investigate
+  #   displayHTML(html2)
     
-    
-  def comparison_viewer(self) -> None:
-    """
-    Produce an interactive dashboard for querying comparison details.
-    See this video for an indepth explanation of interpreting this dashboard: https://www.youtube.com/watch?v=DNvCMqjipis
+  ## TODO: temporarily disabled because Sphinx doesn't play with displayHTML()    
+  # def comparison_viewer(self) -> None:
+  #   """
+  #   Produce an interactive dashboard for querying comparison details.
+  #   See this video for an indepth explanation of interpreting this dashboard: https://www.youtube.com/watch?v=DNvCMqjipis
 
-    Writes a HTML file to DBFS at "/dbfs/Users/{username}/scv.html"
+  #   Writes a HTML file to DBFS at "/dbfs/Users/{username}/scv.html"
 
-    Returns None.
-    """
-    path=f"/dbfs/Users/{self.username}/scv.html"
+  #   Returns None.
+  #   """
+  #   path=f"/dbfs/Users/{self.username}/scv.html"
 
-    self.best_linker.comparison_viewer_dashboard(self.best_predictions_df, path, overwrite=True)
+  #   self.best_linker.comparison_viewer_dashboard(self.best_predictions_df, path, overwrite=True)
 
-    with open("/dbfs" + path, "r") as f:
-        html=f.read()
+  #   with open("/dbfs" + path, "r") as f:
+  #       html=f.read()
     
-    ## TODO: this method currently breaks Sphinx, need to investigate
-    displayHTML(html)
+  #   ## TODO: this method currently breaks Sphinx, need to investigate
+  #   displayHTML(html)
  
 
   def match_weights_chart(self) -> None:
     """
-    Get the
-    Returns
+    Get the match_weights_chart
 
     """
     return self.best_linker.match_weights_chart()
     
     
   def get_scores_df(self, data_df, predictions_df, unique_id, true_label):
+    """
+    
+    """
     left_df = data_df.select(F.col(unique_id).alias(f"{unique_id}_l"), F.col(true_label).alias("true_label"))
     right_df = data_df.select(F.col(unique_id).alias(f"{unique_id}_r"), F.col(true_label).alias("score_label"))
     
