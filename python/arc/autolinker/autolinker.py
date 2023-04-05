@@ -192,47 +192,23 @@ class AutoLinker:
     df_matched = data.filter("_cluster_count>1")
     df_unmatched = data.filter("_cluster_count=1")
 
-    entropy_whole_data_scaled = self._calculate_dataset_entropy(data, attribute_columns, by_cluster=False, base=num_clusters)
-    entropy_whole_data_static = self._calculate_dataset_entropy(data, attribute_columns, by_cluster=False, base=9999)
-    entropy_whole_data_adjusted = self._calculate_dataset_entropy(data, attribute_columns, by_cluster=False, base=base)
-
     # Calculate matched whole data entropy
     entropy_matched_scaled = self._calculate_dataset_entropy(df_matched, attribute_columns, by_cluster=False, base=num_clusters)
-    entropy_matched_static = self._calculate_dataset_entropy(df_matched, attribute_columns, by_cluster=False, base=9999)
     entropy_matched_adjusted = self._calculate_dataset_entropy(df_matched, attribute_columns, by_cluster=False, base=base)
-    entropy_unmatched_scaled = self._calculate_dataset_entropy(df_unmatched, attribute_columns, by_cluster=False, base=num_clusters)
-    entropy_unmatched_static = self._calculate_dataset_entropy(df_unmatched, attribute_columns, by_cluster=False, base=9999)
-    entropy_unmatched_adjusted = self._calculate_dataset_entropy(df_unmatched, attribute_columns, by_cluster=False, base=base)
     
     # Calculate mean entropy by clusters
     entropy_cluster_mean_scaled = self._calculate_dataset_entropy(df_matched, attribute_columns, by_cluster=True, base=num_clusters)
-    entropy_cluster_mean_static = self._calculate_dataset_entropy(df_matched, attribute_columns, by_cluster=True, base=9999)
     entropy_cluster_mean_adjusted = self._calculate_dataset_entropy(df_matched, attribute_columns, by_cluster=True, base=base)
-    
-    # Information gain: matched data entropy - mean entropy in each cluster
-    # IG1
-    information_gain1_scaled = np.sum([entropy_whole_data_scaled[c] - np.mean([entropy_matched_scaled[c], entropy_unmatched_scaled[c]]) for c in attribute_columns])
-    information_gain1_static = np.sum([entropy_whole_data_static[c] - np.mean([entropy_matched_static[c], entropy_unmatched_static[c]]) for c in attribute_columns])
-    information_gain1_adjusted = np.sum([entropy_whole_data_adjusted[c] - np.mean([entropy_matched_adjusted[c], entropy_unmatched_adjusted[c]]) for c in attribute_columns])
-    # ID
-    impurity_divergence_scaled = np.sum([entropy_unmatched_scaled[c] - entropy_matched_scaled[c] for c in attribute_columns])
-    impurity_divergence_static = np.sum([entropy_unmatched_static[c] - entropy_matched_static[c] for c in attribute_columns])
-    impurity_divergence_adjusted = np.sum([entropy_unmatched_adjusted[c] - entropy_matched_adjusted[c] for c in attribute_columns])
-    # IG2
+ 
+    # Information Gain
     information_gain2_scaled = np.sum([entropy_matched_scaled[c] - entropy_cluster_mean_scaled[c] for c in attribute_columns])
-    information_gain2_static = np.sum([entropy_matched_static[c] - entropy_cluster_mean_static[c] for c in attribute_columns])
     information_gain2_adjusted = np.sum([entropy_matched_adjusted[c] - entropy_cluster_mean_adjusted[c] for c in attribute_columns])
+
+    # Power Ratio of scaled and adjusted information gains
+    information_gain_power_ratio = math.pow(information_gain2_scaled, information_gain2_adjusted)
     
     unsupervised_metrics = {
-      "information_gain1_scaled": information_gain1_scaled,
-      "information_gain1_static": information_gain1_static,
-      "information_gain1_adjusted": information_gain1_adjusted,
-      "impurity_divergence_scaled": impurity_divergence_scaled,
-      "impurity_divergence_static": impurity_divergence_static,
-      "impurity_divergence_adjusted": impurity_divergence_adjusted,
-      "information_gain2_scaled": information_gain2_scaled,
-      "information_gain2_static": information_gain2_static,
-      "information_gain2_adjusted": information_gain2_adjusted,
+      "information_gain_power_ratio": information_gain_power_ratio
     }
 
     return unsupervised_metrics
@@ -799,7 +775,8 @@ class AutoLinker:
     training_columns:list=None,
     threshold:float=0.9,
     true_label:str=None,
-    random_seed:int=42
+    random_seed:int=42,
+    metric:str="information_gain_power_ratio"
   ) -> None:
     """
     Method to run a series of hyperopt trials.
@@ -850,7 +827,7 @@ class AutoLinker:
         true_label=true_label
       )
       
-      loss = -evals["f1_score"]
+      loss = -evals[metric]
       
       result = {'loss': loss, 'status': STATUS_OK, 'run_id': run_id}
       for k, v in evals.items():
