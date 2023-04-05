@@ -96,40 +96,6 @@ class AutoLinker:
 
   def __str__(self):
     return f"AutoLinker instance working in {self.catalog}.{self.schema} and MLflow experiment {self.experiment_name}"
-  
-  
-  
-  def _calculate_column_entropy(
-    self,
-    data: pyspark.sql.DataFrame,
-    column: str,
-    by_cluster: bool=False
-    ) -> float:
-    """
-    Method to calculate column entropy given a dataset, based on:
-    :math:`Entropy = -SUM(P*ln(P))`
-    where P is the normalised count of the occurrence of each unique value in the column.
-    
-    :param data: input dataframe with row per record
-    :param column: (valid) name of column to calculate entropy on
-    :param by_cluster: if True, it will calculate the average entropy when the dataset is split by clusters.
-    """
-    
-    if by_cluster:
-      cluster_groupby = "cluster_id"
-    else:
-      cluster_groupby = F.lit(1)
-    
-    # replace null values with dummy
-    data = data.fillna("null_")
-
-    df_entropy = data \
-      .groupBy(cluster_groupby) \
-      .agg(arcf.arc_entropy_agg(column)).select(F.col(f"arc_entropyaggexpression({column}).{column}").alias(f"entropy"))
-    
-    mean_entropy = df_entropy.select(F.mean("entropy").alias("mean_entropy")).collect()[0]["mean_entropy"]
-    
-    return mean_entropy
 
   
   def _calculate_dataset_entropy(
@@ -492,44 +458,6 @@ class AutoLinker:
         raise ValueError(f"Unknown distance function {distance_function} passed.")
 
     return comparison_list
-  
-  
-
-  def deduplicate_records(
-    self,
-    predictions:splink.splink_dataframe.SplinkDataFrame,
-    linker:splink.spark.spark_linker.SparkLinker,
-    attribute_columns:list,
-    threshold:float=0.9
-  ) -> pyspark.sql.DataFrame:
-    """
-    Method to deduplicate the original dataset given the predictions dataframe, its linker
-    object and an optional threshold. The clusters are grouped on and duplicates are set to the same value (arbitrarily).
-    These are then replaced in the original dataset.
-    
-    Returns a spark Dataframe with deduplicated records.
-
-    :param predictions: Splink Dataframe that's a result of a linker.predict() call
-    :param linker: a trained linker object, needed to cluster
-    :param attribute_columns: list of column names containing attribtues in the data
-    :param threshold: the probability threshold above which a pair is considered a match
-    
-    """
-    
-    # Cluster records that are matched above threshold
-    clusters = linker.cluster_pairwise_predictions_at_threshold(predictions, threshold_match_probability=threshold)
-    # define window to aggregate over
-    window = Window.partitionBy("cluster_id")
-    df_predictions = clusters.as_spark_dataframe()
-    # loop through the attributes and standardise. we want to keep original column names.
-    for attribute_column in attribute_columns:
-      df_predictions = (
-        df_predictions
-        .withColumn(attribute_column, F.first(F.col(attribute_column)).over(window)) # standardise values
-      )
-
-    return df_predictions
-  
   
   
   def _randomise_columns(
