@@ -121,7 +121,7 @@ class AutoLinker:
         *(F.expr(f"mean(ent_map.{c}) as {c}") for c in attribute_columns)
       ).collect()[0]
 
-    entropy_dict = {c: entropies[c] for c in attribute_columns}
+    entropy_dict = {c: entropies[c] if entropies[c] else 0.0 for c in attribute_columns}
     
     return entropy_dict
   
