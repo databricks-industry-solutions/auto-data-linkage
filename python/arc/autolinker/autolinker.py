@@ -4,7 +4,7 @@ from pyspark.sql import Window
 import pyspark
 from arc.sql import functions as arcf
 
-# from dbruntime.display import displayHTML
+from dbruntime.display import displayHTML
 
 import splink
 from splink.spark.spark_linker import SparkLinker
@@ -799,51 +799,51 @@ class AutoLinker:
         self._do_clustering()
     return self.clusters.as_spark_dataframe()
         
-  ## TODO: temporarily disabled because Sphinx doesn't play with displayHTML()  
-  # def cluster_viewer(self):
-  #   """
-  #   Produce an interactive dashboard for visualising clusters. It provides examples of clusters of different sizes.
-  #   The shape and size of clusters can be indicative of problems with record linkage, so it provides a tool to help you
-  #   find potential false positive and negative links.
-  #   See this video for an indepth explanation of interpreting this dashboard: https://www.youtube.com/watch?v=DNvCMqjipis
+  # TODO: temporarily disabled because Sphinx doesn't play with displayHTML()  
+  def cluster_viewer(self):
+    """
+    Produce an interactive dashboard for visualising clusters. It provides examples of clusters of different sizes.
+    The shape and size of clusters can be indicative of problems with record linkage, so it provides a tool to help you
+    find potential false positive and negative links.
+    See this video for an indepth explanation of interpreting this dashboard: https://www.youtube.com/watch?v=DNvCMqjipis
 
-  #   Writes a HTML file to DBFS at "/dbfs/Users/{username}/scv.html"
+    Writes a HTML file to DBFS at "/dbfs/Users/{username}/scv.html"
 
-  #   """
-  #   # do clustering if not already done and no clusters provided
-  #   if not self.clusters:
-  #     raise ValueError("Pairs have not yet been clustered. Please run best_clusters_at_threshold() with an optional"
-  #                      "threshold argument to generate clusters. ")
+    """
+    # do clustering if not already done and no clusters provided
+    if not self.clusters:
+      raise ValueError("Pairs have not yet been clustered. Please run best_clusters_at_threshold() with an optional"
+                       "threshold argument to generate clusters. ")
       
-  #   path=f"/Users/{self.username}/clusters.html"
-  #   self.best_linker.cluster_studio_dashboard(self.best_predictions_df, self.clusters, path, sampling_method="by_cluster_size", overwrite=True)
+    path=f"/Users/{self.username}/clusters.html"
+    self.best_linker.cluster_studio_dashboard(self.best_predictions_df, self.clusters, path, sampling_method="by_cluster_size", overwrite=True)
     
-  #   # splink automatically prepends /dbfs to the output path
-  #   with open("/dbfs" + path, "r") as f:
-  #       html2=f.read()
+    # splink automatically prepends /dbfs to the output path
+    with open("/dbfs" + path, "r") as f:
+        html2=f.read()
     
-  #   ## TODO: this method currently breaks Sphinx, need to investigate
-  #   displayHTML(html2)
+    ## TODO: this method currently breaks Sphinx, need to investigate
+    displayHTML(html2)
     
-  ## TODO: temporarily disabled because Sphinx doesn't play with displayHTML()    
-  # def comparison_viewer(self) -> None:
-  #   """
-  #   Produce an interactive dashboard for querying comparison details.
-  #   See this video for an indepth explanation of interpreting this dashboard: https://www.youtube.com/watch?v=DNvCMqjipis
+  # TODO: temporarily disabled because Sphinx doesn't play with displayHTML()    
+  def comparison_viewer(self) -> None:
+    """
+    Produce an interactive dashboard for querying comparison details.
+    See this video for an indepth explanation of interpreting this dashboard: https://www.youtube.com/watch?v=DNvCMqjipis
 
-  #   Writes a HTML file to DBFS at "/dbfs/Users/{username}/scv.html"
+    Writes a HTML file to DBFS at "/dbfs/Users/{username}/scv.html"
 
-  #   Returns None.
-  #   """
-  #   path=f"/dbfs/Users/{self.username}/scv.html"
+    Returns None.
+    """
+    path=f"/dbfs/Users/{self.username}/scv.html"
 
-  #   self.best_linker.comparison_viewer_dashboard(self.best_predictions_df, path, overwrite=True)
+    self.best_linker.comparison_viewer_dashboard(self.best_predictions_df, path, overwrite=True)
 
-  #   with open("/dbfs" + path, "r") as f:
-  #       html=f.read()
+    with open("/dbfs" + path, "r") as f:
+        html=f.read()
     
-  #   ## TODO: this method currently breaks Sphinx, need to investigate
-  #   displayHTML(html)
+    ## TODO: this method currently breaks Sphinx, need to investigate
+    displayHTML(html)
  
 
   def match_weights_chart(self) -> None:
