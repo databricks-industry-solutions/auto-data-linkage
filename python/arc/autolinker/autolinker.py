@@ -399,6 +399,49 @@ class AutoLinker:
     return data
   
 
+  def _convert_hyperopt_to_splink(self) -> dict:
+    """
+    Method to convert hyperopt trials to a dictionary that can be used to
+    train a linker model. Used for training the best linker model at the end of an experiment.
+    Sets class attributes for best metric and parameters as well.
+    Returns a dictionary.
+    """
+    # Set best params, metrics and results
+    t = self.trials.best_trial
+    self.best_metric = t['result']['loss']
+    params = t['misc']['vals']
+    blocking_rules = t['misc']['vals']['blocking_rules'][0]
+    comparison_params = {}
+
+    for k, v in params.items():
+      if ("threshold" in k) & (len(v)>0):
+        column, function, _ = k.split('|')
+        comparison_params.update({
+          column: {
+            "function": function,
+            "threshold": v[0]
+          }
+        })
+
+    self.best_params = {
+      "blocking_rules": self.blocking_rules[blocking_rules],
+      "comparisons": comparison_params
+    }
+
+    best_comparisons = {}
+    for k, v in comparison_params.items():
+      best_comparisons.update({
+        k: {"distance_function": {"distance_function": v['function'], "threshold": v['threshold']}}
+      })
+      
+    best_params_for_rt = {
+      "blocking_rules": self.best_params['blocking_rules'],
+      "comparisons": best_comparisons
+    }
+
+    return best_params_for_rt
+
+
   def _create_comparison_list(
     self,
     space:dict
@@ -731,18 +774,18 @@ class AutoLinker:
         rstate=np.random.default_rng(random_seed)
       )
         
+    # Get best params and retrain
+    best_param_for_rt = self._convert_hyperopt_to_splink()
+    
     self.best_run_id = self.trials.best_trial["result"]["run_id"]
-        
+    self.best_linker, self.best_predictions_df = self.train_linker(data, best_param_for_rt, attribute_columns, unique_id, self.training_columns)
+
     
     # return succes text
     success_text = f"""
     ======================================================================================
                                       AutoLinking completed.
     ======================================================================================
-
-    You can now access the best model with
-    >>> best_model = autolinker.get_best_splink_model()
-
     """
 
     print(success_text)
