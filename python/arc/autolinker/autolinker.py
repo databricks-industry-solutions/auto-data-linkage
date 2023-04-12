@@ -625,7 +625,7 @@ class AutoLinker:
     start = datetime.now()
     
     # Train model
-    linker, predictions = self.train_linker(data, space, attribute_columns, unique_id, deterministic_columns, training_columns)
+    linker, predictions = self.train_linker(data, space, attribute_columns, unique_id, training_columns)
 
     end = datetime.now()
 
