@@ -3,8 +3,12 @@ from pyspark.sql.types import *
 from pyspark.sql import Window
 import pyspark
 from arc.sql import functions as arcf
+import os
 
-# from dbruntime.display import displayHTML
+if "DATABRICKS_RUNTIME_VERSION" in os.environ:
+  from dbruntime.display import displayHTML
+
+  
 
 import splink
 from splink.spark.spark_linker import SparkLinker
@@ -715,7 +719,7 @@ class AutoLinker:
     
     # initialise trials and create hyperopt space
     self.trials = Trials()
-    space = self._create_hyperopt_space(data, attribute_columns, comparison_size_limit, unique_id)
+    space = self._create_hyperopt_space(data, attribute_columns, comparison_size_limit)
     
       # run hyperopt trials
     self.best = fmin(
