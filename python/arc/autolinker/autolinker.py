@@ -4,7 +4,7 @@ from pyspark.sql import Window
 import pyspark
 from arc.sql import functions as arcf
 
-from dbruntime.display import displayHTML
+# from dbruntime.display import displayHTML
 
 import splink
 from splink.spark.spark_linker import SparkLinker
