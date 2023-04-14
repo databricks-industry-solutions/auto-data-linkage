@@ -846,7 +846,7 @@ class AutoLinker:
         self._do_clustering()
     return self.clusters.as_spark_dataframe()
         
-  # TODO: temporarily disabled because Sphinx doesn't play with displayHTML()  
+  
   def cluster_viewer(self):
     """
     Produce an interactive dashboard for visualising clusters. It provides examples of clusters of different sizes.
@@ -869,7 +869,7 @@ class AutoLinker:
     with open("/dbfs" + path, "r") as f:
         html2=f.read()
     
-    ## TODO: this method currently breaks Sphinx, need to investigate
+
     displayHTML(html2)
     
   # TODO: temporarily disabled because Sphinx doesn't play with displayHTML()    
@@ -889,7 +889,7 @@ class AutoLinker:
     with open("/dbfs" + path, "r") as f:
         html=f.read()
     
-    ## TODO: this method currently breaks Sphinx, need to investigate
+  
     displayHTML(html)
  
 
