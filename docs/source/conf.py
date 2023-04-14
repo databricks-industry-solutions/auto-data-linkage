@@ -73,4 +73,5 @@ html_css_files = ["css/custom.css"]
 html_theme_options = {
     "source_url": 'https://github.com/databricks-industry-solutions/auto-data-linkage',
     "source_icon": "github",
+    "banner_text": "ARC (Auto-Record-Linkage) is a simple, scalable and unsupervised record linkage library on Databricks.",
 }
