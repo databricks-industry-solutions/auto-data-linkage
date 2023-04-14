@@ -12,7 +12,8 @@ class TestARC_SQL(ArcTestCase):
         ).show()
 
         df.select(
-            f.arc_entropy_agg("col1", "col2", "col3", "col4")
+            f.arc_entropy_agg(0, "col1", "col2", "col3", "col4"),
+            f.arc_entropy_agg(10, "col1", "col2", "col3", "col4")
         ).show()
 
 

@@ -12,28 +12,17 @@ import org.apache.spark.sql.types._
 import java.io.ByteArrayInputStream
 
 case class ARC_EntropyAggExpression(
-    attributeExprs: Seq[Expression],
-    attributeNames: Seq[String],
+    attributeMap: Map[String, Expression],
+    base: Int = 0,
     mutableAggBufferOffset: Int = 0,
     inputAggBufferOffset: Int = 0
 ) extends TypedImperativeAggregate[EntropyCountAccumulatorMap] {
-
-    private val attributeMap = attributeNames.zip(attributeExprs).toMap
-
-    private def serializer: Kryo = {
-        val kryo = new Kryo()
-        kryo.register(classOf[scala.Tuple2[Any, Any]], new com.twitter.chill.Tuple2Serializer)
-        kryo.register(classOf[Array[(String, Long)]])
-        kryo.register(classOf[Array[(String, Array[(String, Long)])]])
-        kryo.register(classOf[EntropyCountNestedList])
-        kryo
-    }
 
     override def children: Seq[Expression] = attributeMap.values.toSeq
 
     override def createAggregationBuffer(): EntropyCountAccumulatorMap =
         EntropyCountAccumulatorMap(
-          attributeMap.map(x => (x._1, CountAccumulatorMap())) + ("total" -> CountAccumulatorMap())
+          attributeMap.map(x => (x._1, CountAccumulatorMap()))
         )
 
     override def update(buffer: EntropyCountAccumulatorMap, input: InternalRow): EntropyCountAccumulatorMap = {
@@ -42,7 +31,7 @@ case class ARC_EntropyAggExpression(
             val countMap = buffer.counter(cn)
             (cn, countMap ++ value)
 
-        } + ("total" -> (buffer.counter("total") ++ "total"))
+        }
         EntropyCountAccumulatorMap(result)
     }
 
@@ -57,21 +46,24 @@ case class ARC_EntropyAggExpression(
     }
 
     def logDivisor(countMap: CountAccumulatorMap): Double = {
-        val total = countMap.counter.size
-        if (total <= 2) 1.0 else math.log(total)
+        if (base == 0) {
+            val total = countMap.counter.size
+            if (total < 2 | total == 10) 1.0 else math.log10(total)
+        } else {
+            math.log10(base)
+        }
     }
 
     override def eval(buffer: EntropyCountAccumulatorMap): Any = {
-        val total = buffer.counter("total").counter("total")
         val entropy = buffer.counter
             .map { case (cn, countMap) =>
+                val total = countMap.counter.values.sum
                 val entropy = countMap.counter.map { case (_, count) =>
                     val p = count.toDouble / total
-                    -p * math.log(p) / logDivisor(countMap)
+                    -p * math.log10(p) / logDivisor(countMap)
                 }.sum
                 (cn, entropy)
             }
-            .filterNot(_._1 == "total")
         Utils.buildMapDouble(entropy)
     }
 
@@ -100,6 +92,18 @@ case class ARC_EntropyAggExpression(
 
     override def dataType: DataType = MapType(StringType, DoubleType)
 
-    override protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]): Expression = copy(attributeExprs = newChildren)
+    override protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]): Expression = {
+        val newAttributeMap = attributeMap.keys.zip(newChildren).toMap
+        copy(attributeMap = newAttributeMap)
+    }
+
+    private def serializer: Kryo = {
+        val kryo = new Kryo()
+        kryo.register(classOf[(Any, Any)], new com.twitter.chill.Tuple2Serializer)
+        kryo.register(classOf[Array[(String, Long)]])
+        kryo.register(classOf[Array[(String, Array[(String, Long)])]])
+        kryo.register(classOf[EntropyCountNestedList])
+        kryo
+    }
 
 }

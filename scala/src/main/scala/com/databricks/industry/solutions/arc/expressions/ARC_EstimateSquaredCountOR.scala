@@ -21,10 +21,16 @@ case class ARC_EstimateSquaredCountOR(ruleCombination: Expression, ruleSquareCou
         val arrayData = input.asInstanceOf[ArrayData]
         val rules = arrayData.toArray[UTF8String](StringType).map(_.toString)
         if (rules.length < 2) {
-            ruleSquareCountMap.getOrElse(rules.head, (0L, 0L))._1
+            ruleSquareCountMap.getOrElse(rules.head, (0L, 0L))._2
         } else {
-            val multipliers = rules.map(ruleSquareCountMap)
-            multipliers.map(x => multipliers.map(y => x._1 * y._2).sum).sum - multipliers.map(x => x._1 * x._2).sum
+            val orCombinations = rules.combinations(2)
+            orCombinations.map(orCombination => {
+                val rule1 = orCombination.head
+                val rule2 = orCombination.last
+                val rule1Stats = ruleSquareCountMap(rule1) // (count, squaredCount)
+                val rule2Stats = ruleSquareCountMap(rule2)
+                rule1Stats._1 * rule2Stats._2 + rule2Stats._1 * rule1Stats._2 - rule1Stats._2 * rule2Stats._2
+            }).sum
         }
     }
 
