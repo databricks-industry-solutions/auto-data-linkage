@@ -11,6 +11,8 @@ jobs:
     steps:
     - name: install pandoc
       run: sudo apt-get install pandoc
+    - name: install theme
+      run: pip install -r --target=docs/source/_themes docs/docs-requirements.txt
     - uses: actions/setup-python@v2
       with:
         python-version: '3.9'

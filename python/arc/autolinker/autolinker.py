@@ -2,7 +2,7 @@ from pyspark.sql import functions as F
 from pyspark.sql.types import *
 from pyspark.sql import Window
 import pyspark
-from arc.sql import functions as arcf
+from ..sql import functions as arcf
 import os
 
 if "DATABRICKS_RUNTIME_VERSION" in os.environ:

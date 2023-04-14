@@ -9,3 +9,7 @@ div#top_nav nav h1 img {
 #top_nav nav {
     background-color: #71b1e8 !important;
 }
+
+#show_right_sidebar {
+    top: 2.3rem !important;
+}

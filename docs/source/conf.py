@@ -14,7 +14,8 @@ import os
 import sys
 
 
-sys.path.insert(0, os.path.abspath('../../arc'))
+sys.path.insert(0, os.path.abspath('../../python'))
+sys.path.append(os.path.abspath('./_theme'))
 # -- Project information -----------------------------------------------------
 
 project = 'ARC'
@@ -69,3 +70,7 @@ html_logo = '_images/logo.png'
 html_static_path = ['_static']
 html_css_files = ["css/custom.css"]
 
+html_theme_options = {
+    "source_url": 'https://github.com/databricks-industry-solutions/auto-data-linkage',
+    "source_icon": "github",
+}
