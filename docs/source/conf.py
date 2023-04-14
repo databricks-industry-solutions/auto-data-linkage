@@ -61,45 +61,11 @@ todo_include_todos = True
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = 'sphinx_material'
+html_theme = 'piccolo_theme'
+html_theme_path = ['_theme']
 
-# Material theme options (see theme.conf for more information)
-html_theme_options = {
+html_logo = '_images/logo.png'
 
-    # Set the name of the project to appear in the navigation.
-    'nav_title': f'ARC {release}',
-
-    # Specify a base_url used to generate sitemap.xml. If not
-    # specified, then no sitemap will be built.
-    # 'base_url': 'https://project.github.io/project',
-
-    # Set the color and the accent color
-    'color_primary': 'green',
-    'color_accent': 'green',
-
-    # Set the repo location to get a badge with stats
-    'repo_url': 'https://github.com/databricks-industry-solutions/splink-public-sector-hackathon',
-    'repo_name': 'ARC',
-
-    'globaltoc_depth': 3,
-    'globaltoc_collapse': False,
-    'globaltoc_includehidden': True,
-    'heroes': {'index': 'Simple, automated and unsupervised data linking solution on Databricks.',
-               'examples/index': 'examples and tutorials to get started with '
-                                 'ARC'},
-    "version_dropdown": True,
-    # "version_json": "../versions-v2.json",
-
-}
-html_title = project
-html_short_title = project
-# html_logo = 'images/logo.svg'
-html_sidebars = {
-    "**": ["logo-text.html", "globaltoc.html", "localtoc.html", "searchbox.html"]
-}
-
-# Add any paths that contain custom static files (such as style sheets) here,
-# relative to this directory. They are copied after the builtin static files,
-# so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
 html_css_files = ["css/custom.css"]
+
