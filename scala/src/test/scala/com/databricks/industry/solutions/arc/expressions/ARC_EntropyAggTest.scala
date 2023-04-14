@@ -9,4 +9,6 @@ class ARC_EntropyAggTest extends QueryTest with SharedSparkSession with ARC_Entr
 
     test("ARC_EntropyAgg values") { testEntropyAggValues() }
 
+    test("ARC_EntropyAgg expression methods") { testExpressionMethods() }
+
 }

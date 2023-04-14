@@ -22,13 +22,17 @@ object functions {
         arc_combinatorial_count_agg(nCombination, cols.asScala: _*)
     }
 
-    def arc_entropy_agg(cols: String*): Column = {
-        val exprs = cols.map(cn => new Column(cn).expr)
-        new Column(ARC_EntropyAggExpression(exprs, cols).toAggregateExpression())
+    def arc_entropy_agg(base: Int, cols: String*): Column = {
+        val exprs = cols.map(cn => cn -> new Column(cn).expr).toMap
+        new Column(ARC_EntropyAggExpression(exprs, base).toAggregateExpression())
     }
 
-    def arc_entropy_agg(cols: java.util.ArrayList[String]): Column = {
-        arc_entropy_agg(cols.asScala: _*)
+    def arc_entropy_agg(cols: String*): Column = {
+        arc_entropy_agg(0, cols: _*)
+    }
+
+    def arc_entropy_agg(base: Int, cols: java.util.ArrayList[String]): Column = {
+        arc_entropy_agg(base, cols.asScala: _*)
     }
 
     def arc_merge_count_map(counter_map: Column): Column = {
