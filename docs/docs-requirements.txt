@@ -11,4 +11,4 @@ mlflow>=1.8.0
 hyperopt>=0.2.0
 pyspark>=3.0.0
 splink>=3.0.0
-piccolo_theme>=0.0.1
+#piccolo_theme>=0.0.1
