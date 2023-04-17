@@ -17,7 +17,7 @@ Documentation
 
 AutoLinker
 ----------
-.. autoclass:: autolinker.autolinker.AutoLinker
+.. autoclass:: arc.autolinker.AutoLinker
     :members:
     :undoc-members:
     :private-members:
@@ -28,12 +28,12 @@ MLflow utilities
 
 Wrapper classes
 ~~~~~~~~~~~~~~~
-.. autoclass:: autolinker.splink_mlflow.splinkSparkMLFlowWrapper
+.. autoclass:: arc.autolinker.splink_mlflow.splinkSparkMLFlowWrapper
    :members:
    :undoc-members:
    :private-members:
 
-.. autoclass:: autolinker.splink_mlflow.SplinkMLFlowWrapper
+.. autoclass:: arc.autolinker.splink_mlflow.SplinkMLFlowWrapper
    :members:
    :undoc-members:
    :private-members:
@@ -41,23 +41,23 @@ Wrapper classes
 
 Utility functions
 ~~~~~~~~~~~~~~~~~
-.. autofunction:: autolinker.splink_mlflow._log_comparison_details
+.. autofunction:: arc.autolinker.splink_mlflow._log_comparison_details
 
-.. autofunction:: autolinker.splink_mlflow._log_comparisons
+.. autofunction:: arc.autolinker.splink_mlflow._log_comparisons
 
-.. autofunction:: autolinker.splink_mlflow._log_hyperparameters
+.. autofunction:: arc.autolinker.splink_mlflow._log_hyperparameters
 
-.. autofunction:: autolinker.splink_mlflow._log_splink_model_json
+.. autofunction:: arc.autolinker.splink_mlflow._log_splink_model_json
 
-.. autofunction:: autolinker.splink_mlflow._save_splink_model_to_mlflow
+.. autofunction:: arc.autolinker.splink_mlflow._save_splink_model_to_mlflow
 
-.. autofunction:: autolinker.splink_mlflow.log_splink_model_to_mlflow
+.. autofunction:: arc.autolinker.splink_mlflow.log_splink_model_to_mlflow
 
-.. autofunction:: autolinker.splink_mlflow._log_linker_charts
+.. autofunction:: arc.autolinker.splink_mlflow._log_linker_charts
 
-.. autofunction:: autolinker.splink_mlflow._log_chart
+.. autofunction:: arc.autolinker.splink_mlflow._log_chart
 
-.. autofunction:: autolinker.splink_mlflow.get_model_json
+.. autofunction:: arc.autolinker.splink_mlflow.get_model_json
 
 
 
