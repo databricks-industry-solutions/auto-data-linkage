@@ -4,7 +4,7 @@ on:
     branches:
     - main
     - "*docs"
-    - test_docs
+    - docs_fix
 jobs:
   build:
     runs-on: ubuntu-latest
