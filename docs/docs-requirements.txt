@@ -1,14 +1,2 @@
 piccolo-theme==0.15.0
-Sphinx==4.4.0
-sphinx-material==0.0.35
-nbsphinx==0.8.8
-pandoc==2.0.1
-ipython==8.10.0
-sphinxcontrib-fulltoc==1.2.0
-livereload==2.6.3
-autodocsumm==0.2.7
-sphinx-tabs==3.2.0
-mlflow>=1.8.0
-hyperopt>=0.2.0
-pyspark>=3.0.0
-splink>=3.0.0
+
