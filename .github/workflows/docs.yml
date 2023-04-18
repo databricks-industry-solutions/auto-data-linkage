@@ -12,8 +12,7 @@ jobs:
     - name: install pandoc
       run: sudo apt-get install pandoc
     - name: install theme
-      run: echo ${PWD} |
-           pip install --target=docs/source/_themes piccolo_theme>=0.0.1
+      run: pip install --target=docs/source/_themes piccolo-theme>=0.0.1
     - uses: actions/setup-python@v2
       with:
         python-version: '3.9'
