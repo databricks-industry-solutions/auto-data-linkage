@@ -11,8 +11,6 @@ jobs:
     steps:
     - name: install pandoc
       run: sudo apt-get install pandoc
-    - name: install theme
-      run: pip install --target=docs/source/_themes piccolo-theme>=0.0.1
     - uses: actions/setup-python@v2
       with:
         python-version: '3.9'
@@ -20,6 +18,10 @@ jobs:
       with:
         ref: main
         fetch-depth: 0 # otherwise, you will failed to push refs to dest repo
+    - name: install theme
+        shell: bash
+        run: |
+          pip install --target=docs/source/_themes piccolo-theme>=0.0.1
     - name: Build and Commit
       uses: sphinx-notes/pages@v2
       with:
