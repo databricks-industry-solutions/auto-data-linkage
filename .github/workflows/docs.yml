@@ -2,31 +2,29 @@ name: docs
 on:
   push:
     branches:
-    - main
-    - "*docs"
-    - docs_fix
+      - main
+      - "*docs"
+      - test_docs
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - name: install pandoc
-      run: sudo apt-get install pandoc
-    - name: install theme
-      run: pip install --target=docs/source/_themes piccolo_theme>=0.0.1
-    - uses: actions/setup-python@v2
-      with:
-        python-version: '3.9'
-    - uses: actions/checkout@v2
-      with:
-        ref: main
-        fetch-depth: 0 # otherwise, you will failed to push refs to dest repo
-    - name: Build and Commit
-      uses: sphinx-notes/pages@v2
-      with:
-        documentation_path: docs/source
-        requirements_path: docs/docs-requirements.txt
-    - name: Push changes
-      uses: ad-m/github-push-action@master
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        branch: gh-pages
+      - name: install pandoc
+        run: sudo apt-get install pandoc
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.9'
+      - uses: actions/checkout@v2
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0 # otherwise, you will failed to push refs to dest repo
+      - name: Build and Commit
+        uses: sphinx-notes/pages@v2
+        with:
+          documentation_path: docs/source
+          requirements_path: docs/docs-requirements.txt
+      - name: Push changes
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: gh-pages
