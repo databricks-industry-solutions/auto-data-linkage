@@ -58,6 +58,10 @@ $$I_{s}^{I_{a}}$$
 
 
 ## Getting Started
+Install Splink and ARC. Note that ARC requires Splink 3.7.1.
+```python
+pip install splink==3.7.2 databricks-arc
+```
 
 Load a Spark DataFrame of data to be deduplicated:
 
