@@ -1,5 +1,15 @@
 # Databricks notebook source
-# MAGIC %pip install --quiet splink mlflow hyperopt
+# MAGIC %md
+# MAGIC # Install ARC and Splink
+
+# COMMAND ----------
+
+# MAGIC %pip install --quiet databricks-arc splink
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC # Load ARC
 
 # COMMAND ----------
 
@@ -8,45 +18,84 @@ import arc
 
 # COMMAND ----------
 
-arc.sql.enable_arc()
+# MAGIC %md
+# MAGIC # Enable ARC
+
+# COMMAND ----------
+
+arc.enable_arc()
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC # Read Data
-# MAGIC Data downloaded and sampled from https://dbs.uni-leipzig.de/research/projects/object_matching/benchmark_datasets_for_entity_resolution
+# MAGIC # Read test data
 
 # COMMAND ----------
 
-# data = spark.read.table("marcell_autosplink.febrl1_uid")
-data = spark.read.table("marcell_autosplink.voters_data_sample")
+data = spark.read.table("marcell_autosplink.febrl1_uid")
 
-# COMMAND ----------
-
-data.columns
-
+data.display()
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC # Run Auto-Linking
+# MAGIC # Perform Auto-linking
 
 # COMMAND ----------
 
 autolinker = AutoLinker()
 
-# COMMAND ----------
-
-attr_cols = ["givenname", "surname", "postcode", "suburb"]
-
-# COMMAND ----------
+attribute_columns = ["given_name", "surname", "street_number", "address_1", "address_2", "suburb", "postcode", "state", "date_of_birth"]
 
 autolinker.auto_link(
-  data=data,                                                             # dataset to dedupe
-  attribute_columns=attr_cols,                                           # columns that contain attributes to compare
-  unique_id="uid",                                                       # column name of the unique ID
-  comparison_size_limit=200000,                                          # Maximum number of pairs when blocking applied
-  max_evals=1000,                                                        # Maximum number of hyperopt trials to run
-  threshold=0.5,
-  true_label="recid"
+  data=data,                                                         # Spark DataFrame of data to deduplicate
+  attribute_columns=attribute_columns,                               # List of column names containing attribute to compare
+  unique_id="uid",                                                   # Name of the unique identifier column
+  comparison_size_limit=100000,                                      # Maximum number of pairs to compare
+  max_evals=10                                                       # Number of trials to run during optimisation process
 )
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC # Get clusters from best model
+
+# COMMAND ----------
+
+clusters = autolinker.best_clusters_at_threshold(threshold=0.3)
+clusters.display()
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC # Retrieve pairwise predictions
+
+# COMMAND ----------
+
+autolinker.best_predictions_df.as_spark_dataframe().display()
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC # Use Splink functionality
+
+# COMMAND ----------
+
+autolinker.cluster_viewer()
+
+# COMMAND ----------
+
+autolinker.match_weights_chart()
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC # Retrieve the best model directly from `autolinker`
+
+# COMMAND ----------
+
+linker = autolinker.best_linker
+
+# COMMAND ----------
+
+linker.profile_columns("surname")
