@@ -163,8 +163,8 @@ def log_splink_model_to_mlflow(
     model = SplinkMLFlowWrapper()
     model.set_spark_linker(linker)
     mlflow.pyfunc.log_model(model_name, python_model=model)
-    if log_profiling_charts or log_parameters_charts:
-        _log_linker_charts(linker, log_parameters_charts, log_profiling_charts)
+    # if log_profiling_charts or log_parameters_charts:
+        # _log_linker_charts(linker, log_parameters_charts, log_profiling_charts)
     if params:
         mlflow.log_params(params)
     if metrics:
