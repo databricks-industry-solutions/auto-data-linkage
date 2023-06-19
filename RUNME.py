@@ -44,14 +44,14 @@ job_json = {
         {
             "job_cluster_key": "auto_data_linkage_cluster",
             "notebook_task": {
-                "notebook_path": f"01_Introduction_And_Setup"
+                "notebook_path": f"01_Download_Dataset"
             },
             "task_key": "auto_data_linkage_01"
         },
         {
             "job_cluster_key": "auto_data_linkage_cluster",
             "notebook_task": {
-                "notebook_path": f"02_Analysis"
+                "notebook_path": f"02_Run_Example_Linking"
             },
             "task_key": "auto_data_linkage_02",
             "depends_on": [
