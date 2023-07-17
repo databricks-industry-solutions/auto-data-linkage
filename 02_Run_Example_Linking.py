@@ -31,8 +31,8 @@ arc.enable_arc()
 # MAGIC # Read test data
 
 # COMMAND ----------
-
-data = spark.read.table("febrl1")
+data = arc.data.load_dummy_data()
+data = spark.createDataFrame(data)
 
 data.display()
 
