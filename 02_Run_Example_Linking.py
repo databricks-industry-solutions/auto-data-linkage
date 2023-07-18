@@ -31,8 +31,8 @@ arc.enable_arc()
 # MAGIC # Read test data
 
 # COMMAND ----------
-data = pd.read_csv("./data/arc_febrl1.csv")
-data = spark.createDataFrame(data)
+import os
+data = spark.read.csv(f"file:{os.getcwd()}/data/arc_febrl1.csv", header=True)
 
 data.display()
 
