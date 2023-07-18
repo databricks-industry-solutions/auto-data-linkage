@@ -32,7 +32,7 @@ arc.enable_arc()
 
 # COMMAND ----------
 import os
-data = spark.read.csv(f"file:{os.getcwd()}/data/arc_febrl1.csv", header=True)
+data = spark.read.csv(f"file:{os.getcwd()}/data/arc_febrl1.csv", header=True) #we need the file: prefix for spark to correctly read the data file
 
 data.display()
 
