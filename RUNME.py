@@ -44,16 +44,16 @@ job_json = {
         {
             "job_cluster_key": "auto_data_linkage_cluster",
             "notebook_task": {
-                "notebook_path": f"Run_Example_Linking"
+                "notebook_path": f"01_Run_Example_Linking"
             },
-            "task_key": "auto_data_linkage_"
+            "task_key": "auto_data_linkage_01"
         }
     ],
     "job_clusters": [
         {
             "job_cluster_key": "auto_data_linkage_cluster",
             "new_cluster": {
-                "spark_version": "11.3.x-cpu-ml-scala2.12",
+                "spark_version": "12.2.x-cpu-ml-scala2.12",
                 "spark_conf": {
                     "spark.databricks.delta.formatCheck.enabled": "false"
                 },
