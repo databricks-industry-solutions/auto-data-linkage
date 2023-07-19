@@ -1,3 +1,3 @@
 from .sql import enable_arc
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
