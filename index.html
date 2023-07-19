@@ -1,0 +1,1018 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Documentation &#8212; ARC v0.0.1 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="_static/basic_mod.css?v=0.7.0-1" />
+    <link rel="stylesheet" type="text/css" href="_static/tabs.css" />
+    <link rel="stylesheet" type="text/css" href="_static/css/custom.css" />
+    <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/doctools.js"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <script src="_static/js/petite-vue.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" /> 
+  </head><body data-dark_mode_code_blocks="true">
+
+<div id="top_nav">
+    
+        <div id="notification_banner" data-banner-hiding="temporary" v-show="!permanentlyHidden">
+    <p v-if="visible" id="content">ARC (Auto-Record-Linkage) is a simple, scalable and unsupervised record linkage library on Databricks.</p>
+    <a class="close" href="#" @click.prevent="toggleVisible()">[[ visible ? '&#x25B2; HIDE' : '&#x25BC; SHOW BANNER' ]]</a>
+</div>
+
+<script>
+(function() {
+    const topNav = document.querySelector('#top_nav')
+    const notificationContent = document.querySelector('#notification_banner p#content').innerText
+    const localStorageKey = 'readNotification'
+    const bannerHiding = document.querySelector('#notification_banner').dataset['bannerHiding']
+    const cssVariableName = '--navbarHeight'
+    const rootElement = document.documentElement
+
+    /*************************************************************************/
+    // Local storage for remembering if the user has read the notification.
+
+    function checkAlreadyRead() {
+        return localStorage.getItem(localStorageKey) == notificationContent
+    }
+
+    function setRead() {
+        localStorage.setItem(localStorageKey, notificationContent)
+    }
+
+    function clearRead() {
+        localStorage.removeItem(localStorageKey)
+    }
+
+    const alreadyRead = checkAlreadyRead()
+    const permanentlyHidden = alreadyRead && bannerHiding == 'permanent'
+
+    /*************************************************************************/
+    // Updating a CSS variable so other elements adjust to the nav bar height.
+
+    function updateNavbarHeight() {
+        // Only update it if the delta is significant. Otherwise it causes
+        // unnecessary browser repaints.
+        const documentStyles = getComputedStyle(rootElement)
+        // We store the value in REM, so need to convert to pixels
+        const currentValue = parseFloat(
+            documentStyles.getPropertyValue(cssVariableName)
+        ) * parseFloat(documentStyles.fontSize)
+
+        const newValue = topNav.clientHeight
+
+        if (newValue - 5 > currentValue) {
+            console.log(`Updating ${cssVariableName} - overlapping`)
+            rootElement.style.setProperty(
+                cssVariableName, newValue + "px"
+            );
+        } else if (currentValue - newValue >= 30) {
+            console.log(`Updating ${cssVariableName} - gap too large`)
+            rootElement.style.setProperty(
+                cssVariableName, newValue + "px"
+            );
+        }
+    }
+
+    /*************************************************************************/
+    // After loading the page, and resizing the window, recalculate the nav bar
+    // height.
+
+    if (!permanentlyHidden) {
+        // This height is approximately correct when there's a banner, so
+        // shouldn't require any page reflow:
+        rootElement.style.setProperty(
+            '--navbarHeight', "5.5rem"
+        );
+
+        document.addEventListener("DOMContentLoaded", function() {
+            updateNavbarHeight()
+        });
+
+        var interval = undefined
+
+        window.addEventListener('resize', () => {
+            if (interval) {
+                clearTimeout(interval)
+            }
+            interval = setTimeout(() => {
+                console.log("Finished resizing")
+                updateNavbarHeight()
+            }, 100)
+        })
+    }
+
+    /*************************************************************************/
+
+    PetiteVue.createApp({
+        visible: !alreadyRead,
+        permanentlyHidden: permanentlyHidden,
+        bannerHiding: bannerHiding,
+        $delimiters: ['[[', ']]'],
+        toggleVisible() {
+            this.visible = !this.visible
+
+            if (this.visible) {
+                clearRead()
+            } else {
+                setRead()
+            }
+
+            if (!this.visible && bannerHiding == 'permanent') {
+                this.permanentlyHidden = true
+            }
+
+            // Run this after Vue has had time to update the DOM:
+            setTimeout(
+                updateNavbarHeight,
+                0
+            )
+        }
+    }).mount('#notification_banner')
+})()
+</script>
+    
+
+    <nav>
+        
+            
+        
+
+        <p id="toggle_sidebar">
+            <a href="#" title="Toggle sidebar">|||</a>
+        </p>
+        <h1><a href="#" title="Go to homepage"><img src="_static/logo.png"/></a></h1>
+            <a id="source_link" href="https://github.com/databricks-industry-solutions/auto-data-linkage">
+    
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512">
+            <path fill="white" d="M 244.8,8 C 106.1,8 0,113.3 0,252 c 0,110.9 69.8,205.8 169.5,239.2 12.8,2.3 17.3,-5.6 17.3,-12.1 0,-6.2 -0.3,-40.4 -0.3,-61.4 0,0 -70,15 -84.7,-29.8 0,0 -11.4,-29.1 -27.8,-36.6 0,0 -22.9,-15.7 1.6,-15.4 0,0 24.9,2 38.6,25.8 21.9,38.6 58.6,27.5 72.9,20.9 2.3,-16 8.8,-27.1 16,-33.7 -55.9,-6.2 -112.3,-14.3 -112.3,-110.5 0,-27.5 7.6,-41.3 23.6,-58.9 -2.6,-6.5 -11.1,-33.3 2.6,-67.9 20.9,-6.5 69,27 69,27 20,-5.6 41.5,-8.5 62.8,-8.5 21.3,0 42.8,2.9 62.8,8.5 0,0 48.1,-33.6 69,-27 13.7,34.7 5.2,61.4 2.6,67.9 16,17.7 25.8,31.5 25.8,58.9 0,96.5 -58.9,104.2 -114.8,110.5 9.2,7.9 17,22.9 17,46.4 0,33.7 -0.3,75.4 -0.3,83.6 0,6.5 4.6,14.4 17.3,12.1 C 428.2,457.8 496,362.9 496,252 496,113.3 383.5,8 244.8,8 Z"/>
+        </svg>
+    
+</a>
+        
+
+        <a id="mode_toggle" href="#" @click.prevent="handleClick" :title="mode">
+    <template v-if="mode == 'light'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_light"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><circle cx="39.311" cy="39.524" r="15.734" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.212,4.901c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901l-0,9.614c-0,2.705 2.196,4.901 4.9,4.901c2.705,0 4.901,-2.196 4.901,-4.901l0,-9.614Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M67.48,18.073c1.913,-1.912 1.913,-5.018 0,-6.931c-1.912,-1.912 -5.018,-1.912 -6.931,0l-6.798,6.799c-1.912,1.912 -1.912,5.018 0,6.931c1.913,1.912 5.018,1.912 6.931,-0l6.798,-6.799Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.728,61.108c1.912,-1.913 1.912,-5.018 -0,-6.931c-1.913,-1.913 -5.019,-1.913 -6.931,-0l-6.799,6.798c-1.912,1.913 -1.912,5.019 0,6.931c1.913,1.913 5.019,1.913 6.931,0l6.799,-6.798Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.682,54.177c-1.913,-1.913 -5.018,-1.913 -6.931,-0c-1.912,1.913 -1.912,5.018 0,6.931l6.798,6.798c1.913,1.913 5.019,1.913 6.931,0c1.913,-1.912 1.913,-5.018 0,-6.931l-6.798,-6.798Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M4.901,34.623c-2.705,0 -4.901,2.196 -4.901,4.901c0,2.705 2.196,4.901 4.901,4.901l9.614,0c2.705,0 4.901,-2.196 4.901,-4.901c0,-2.705 -2.196,-4.901 -4.901,-4.901l-9.614,0Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.212,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901l-0,9.614c-0,2.705 2.196,4.901 4.9,4.901c2.705,-0 4.901,-2.196 4.901,-4.901l0,-9.614Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M18.929,11.142c-1.912,-1.912 -5.018,-1.912 -6.931,0c-1.912,1.913 -1.912,5.019 0,6.931l6.799,6.799c1.912,1.912 5.018,1.912 6.931,-0c1.912,-1.913 1.912,-5.019 -0,-6.931l-6.799,-6.799Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.108,34.623c-2.705,0 -4.901,2.196 -4.901,4.901c-0,2.705 2.196,4.901 4.901,4.901l9.614,0c2.705,0 4.901,-2.196 4.901,-4.901c-0,-2.705 -2.196,-4.901 -4.901,-4.901l-9.614,0Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+
+    <template v-if="mode == 'dark'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_dark"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><circle cx="39.311" cy="39.524" r="15.734" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.212,14.515c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,0 -4.901,2.196 -4.901,4.901c0,2.705 2.197,4.901 4.901,4.901c2.705,0 4.901,-2.196 4.901,-4.901Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M60.662,24.892c1.902,-1.902 1.902,-4.99 0,-6.892l-0.04,-0.039c-1.901,-1.902 -4.989,-1.902 -6.891,-0c-1.901,1.901 -1.901,4.989 0,6.891l0.04,0.04c1.902,1.901 4.989,1.901 6.891,-0Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.732,61.103c1.91,-1.91 1.91,-5.011 0,-6.921l-0.009,-0.01c-1.91,-1.91 -5.012,-1.91 -6.921,-0c-1.91,1.91 -1.91,5.011 -0,6.921l0.01,0.01c1.909,1.91 5.011,1.91 6.92,-0Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.672,54.167c-1.907,-1.907 -5.004,-1.907 -6.911,0l-0.02,0.02c-1.907,1.907 -1.907,5.004 0,6.911c1.907,1.907 5.004,1.907 6.911,-0l0.02,-0.02c1.907,-1.907 1.907,-5.004 0,-6.911Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M14.52,34.623c-2.702,0 -4.896,2.194 -4.896,4.896l0,0.01c0,2.702 2.194,4.896 4.896,4.896c2.702,0 4.896,-2.194 4.896,-4.896l-0,-0.01c-0,-2.702 -2.194,-4.896 -4.896,-4.896Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.212,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.901,2.196 -4.901,4.901c0,2.704 2.197,4.9 4.901,4.9c2.705,0 4.901,-2.196 4.901,-4.9Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M25.73,17.943c-1.911,-1.911 -5.015,-1.911 -6.926,0l-0.005,0.005c-1.911,1.911 -1.911,5.015 0,6.926c1.911,1.911 5.015,1.911 6.926,0l0.005,-0.005c1.911,-1.911 1.911,-5.014 -0,-6.926Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.098,34.623c-2.699,0 -4.891,2.192 -4.891,4.892l-0,0.019c-0,2.699 2.192,4.891 4.891,4.891c2.7,0 4.892,-2.192 4.892,-4.891l0,-0.019c0,-2.7 -2.192,-4.892 -4.892,-4.892Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+
+    <template v-if="mode == 'darkest'">
+        <svg width="100%" height="100%" viewBox="0 0 79 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g id="mode_darkest"><rect id="Bounds" x="0" y="-0" width="78.623" height="79.049" style="fill:none;"/><path d="M39.315,23.791c8.684,-0 15.734,7.05 15.734,15.733c0,8.684 -7.05,15.734 -15.734,15.734c-8.683,0 -15.733,-7.05 -15.733,-15.734c-0,-8.683 7.05,-15.733 15.733,-15.733Zm0,4.737c6.069,0 10.997,4.927 10.997,10.996c-0,6.069 -4.928,10.996 -10.997,10.996c-6.068,0 -10.996,-4.927 -10.996,-10.996c0,-6.069 4.928,-10.996 10.996,-10.996Z" style="fill:#fff;"/><g id="beams"><g id="beam"><path id="beam1" serif:id="beam" d="M44.216,14.515c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,0 -4.9,2.196 -4.9,4.901c-0,2.705 2.196,4.901 4.9,4.901c2.705,0 4.901,-2.196 4.901,-4.901Z" style="fill:#fff;"/></g><g id="beam2" serif:id="beam"><path id="beam3" serif:id="beam" d="M60.666,24.892c1.902,-1.902 1.902,-4.99 0,-6.892l-0.04,-0.039c-1.901,-1.902 -4.989,-1.902 -6.891,-0c-1.901,1.901 -1.901,4.989 0,6.891l0.04,0.04c1.902,1.901 4.99,1.901 6.891,-0Z" style="fill:#fff;"/></g><g id="beam4" serif:id="beam"><path id="beam5" serif:id="beam" d="M25.737,61.103c1.909,-1.91 1.909,-5.011 -0,-6.921l-0.01,-0.01c-1.91,-1.91 -5.011,-1.91 -6.921,-0c-1.91,1.91 -1.91,5.011 -0,6.921l0.01,0.01c1.91,1.91 5.011,1.91 6.921,-0Z" style="fill:#fff;"/></g><g id="beam6" serif:id="beam"><path id="beam7" serif:id="beam" d="M60.676,54.167c-1.907,-1.907 -5.004,-1.907 -6.911,0l-0.02,0.02c-1.907,1.907 -1.907,5.004 0,6.911c1.907,1.907 5.004,1.907 6.911,-0l0.02,-0.02c1.907,-1.907 1.907,-5.004 0,-6.911Z" style="fill:#fff;"/></g><g id="beam8" serif:id="beam"><path id="beam9" serif:id="beam" d="M14.524,34.623c-2.702,0 -4.896,2.194 -4.896,4.896l0,0.01c0,2.702 2.194,4.896 4.896,4.896c2.702,0 4.896,-2.194 4.896,-4.896l0,-0.01c0,-2.702 -2.194,-4.896 -4.896,-4.896Z" style="fill:#fff;"/></g><g id="beam10" serif:id="beam"><path id="beam11" serif:id="beam" d="M44.216,64.534c0,-2.705 -2.196,-4.901 -4.901,-4.901c-2.704,-0 -4.9,2.196 -4.9,4.901c-0,2.704 2.196,4.9 4.9,4.9c2.705,0 4.901,-2.196 4.901,-4.9Z" style="fill:#fff;"/></g><g id="beam12" serif:id="beam"><path id="beam13" serif:id="beam" d="M25.734,17.943c-1.911,-1.911 -5.015,-1.911 -6.926,0l-0.005,0.005c-1.911,1.911 -1.911,5.015 0,6.926c1.911,1.911 5.015,1.911 6.926,0l0.005,-0.005c1.911,-1.911 1.911,-5.014 0,-6.926Z" style="fill:#fff;"/></g><g id="beam14" serif:id="beam"><path id="beam15" serif:id="beam" d="M64.103,34.623c-2.7,0 -4.892,2.192 -4.892,4.892l-0,0.019c-0,2.699 2.192,4.891 4.892,4.891c2.699,0 4.891,-2.192 4.891,-4.891l0,-0.019c0,-2.7 -2.192,-4.892 -4.891,-4.892Z" style="fill:#fff;"/></g></g></g></svg>
+    </template>
+</a>
+
+<script>
+(function() {
+    const LOCAL_STORAGE_KEY = 'piccoloThemeMode'
+
+    var initialMode = localStorage.getItem(LOCAL_STORAGE_KEY)
+
+    if (initialMode) {
+        // Make sure the value in local storage is valid
+        if (['light', 'dark', 'darkest'].indexOf(initialMode) == -1) {
+            initialMode = 'light'
+            localStorage.setItem(LOCAL_STORAGE_KEY, initialMode)
+        }
+    } else {
+        // Check if the client prefers dark mode
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            initialMode = 'dark'
+        } else {
+            initialMode = 'light'
+        }
+        localStorage.setItem(LOCAL_STORAGE_KEY, initialMode)
+    }
+
+    document.documentElement.dataset.mode = initialMode
+
+    PetiteVue.createApp({
+        'mode': initialMode,
+        handleClick() {
+            let currentMode = this.mode
+
+            if (currentMode == 'light') {
+                this.mode = 'dark'
+            } else if (currentMode == 'dark') {
+                this.mode = 'darkest'
+            } else if (currentMode == 'darkest') {
+                this.mode = 'light'
+            }
+
+            document.documentElement.dataset.mode = this.mode
+            localStorage.setItem(LOCAL_STORAGE_KEY, this.mode)
+
+            console.log(this.mode)
+        }
+    }).mount('#mode_toggle')
+})()
+</script>
+            <p class="mobile_search_link">
+                <a href="search.html" title="Search">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 65 64" fill-rule="evenodd" stroke-linejoin="round" stroke-miterlimit="2">
+                        <path d="M14.873 40.009c-2.315-3.943-3.642-8.532-3.642-13.429C11.231 11.91 23.141 0 37.811 0s26.58 11.91 26.58 26.58-11.91 26.58-26.58 26.58a26.44 26.44 0 0 1-14.277-4.161L9.739 62.794a3.12 3.12 0 0 1-4.413 0L.913 58.382c-1.217-1.218-1.217-3.196 0-4.413l13.96-13.96zM37.811 8.054c10.225 0 18.526 8.301 18.526 18.526s-8.301 18.526-18.526 18.526-18.526-8.301-18.526-18.526S27.586 8.054 37.811 8.054z" fill="#fff" />
+                    </svg>
+                </a>
+            </p>
+        
+
+        <div class="searchbox_wrapper">
+            
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+        </div>
+    </nav>
+</div>
+
+    
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+        </div>
+      </div>
+
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <p>Welcome to ARC’s documentation!</p>
+<div class="section" id="documentation">
+<h1>Documentation<a class="headerlink" href="#documentation" title="Permalink to this headline">¶</a></h1>
+<div class="toctree-wrapper compound">
+</div>
+<div class="section" id="autolinker">
+<h2>AutoLinker<a class="headerlink" href="#autolinker" title="Permalink to this headline">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="arc.autolinker.AutoLinker">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">arc.autolinker.</span></span><span class="sig-name descname"><span class="pre">AutoLinker</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">spark</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">catalog</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">schema</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">experiment_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">training_columns</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">deterministic_columns</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.AutoLinker" title="Permalink to this definition">¶</a></dt>
+<dd><p>Class to create object arc for automated data linking.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>spark</strong> (<em>str</em>) – Spark instance used</p></li>
+<li><p><strong>catalog</strong> (<em>str</em>) – Unity Catalog name, if used, for intermediate tables</p></li>
+<li><p><strong>schema</strong> (<em>str</em>) – Schema/database name for intermediate tables</p></li>
+<li><p><strong>experiment_name</strong> (<em>str</em>) – Location or simply name of the MLflow experiment for storing trial run results</p></li>
+<li><p><strong>training_columns</strong> (<em>list</em>) – Valid list of columns (or column names separated by ‘&amp;’ for AND combinations) of columns to be fixed during EM training</p></li>
+<li><p><strong>deterministic_columns</strong> (<em>list</em>) – Valid list of columns (or column names separated by ‘&amp;’ for AND combinations) of columns to be used for prior estimation</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+<p>Basic usage:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span>
+</pre></div>
+</div>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">arc</span> <span class="o">=</span> <span class="n">AutoLinker</span><span class="p">(</span>
+<span class="gp">... </span>  <span class="n">catalog</span><span class="o">=</span><span class="s2">&quot;splink_catalog&quot;</span><span class="p">,</span>                <span class="c1"># catalog name</span>
+<span class="gp">... </span>  <span class="n">schema</span><span class="o">=</span><span class="s2">&quot;splink_schema&quot;</span><span class="p">,</span>                  <span class="c1"># schema to write results to</span>
+<span class="gp">... </span>  <span class="n">experiment_name</span><span class="o">=</span><span class="s2">&quot;autosplink_experiment&quot;</span>  <span class="c1"># MLflow experiment location</span>
+<span class="gp">... </span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">arc</span><span class="o">.</span><span class="n">auto_link</span><span class="p">(</span>
+<span class="gp">... </span>  <span class="n">data</span><span class="o">=</span><span class="n">data</span><span class="p">,</span>                               <span class="c1"># dataset to dedupe</span>
+<span class="gp">... </span>  <span class="n">attribute_columns</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">,</span> <span class="s2">&quot;D&quot;</span><span class="p">],</span>  <span class="c1"># columns that contain attributes to compare</span>
+<span class="gp">... </span>  <span class="n">unique_id</span><span class="o">=</span><span class="s2">&quot;id&quot;</span><span class="p">,</span>                          <span class="c1"># column name of the unique ID</span>
+<span class="gp">... </span>  <span class="n">comparison_size_limit</span><span class="o">=</span><span class="mi">500000</span><span class="p">,</span>            <span class="c1"># Maximum number of pairs when blocking applied</span>
+<span class="gp">... </span>  <span class="n">max_evals</span><span class="o">=</span><span class="mi">100</span>                            <span class="c1"># Maximum number of hyperopt trials to run</span>
+<span class="gp">... </span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">arc</span><span class="o">.</span><span class="n">best_linker</span><span class="o">.</span><span class="n">m_u_parameters_chart</span><span class="p">()</span>     <span class="c1"># use Splink functionality out-of-the-box</span>
+</pre></div>
+</div>
+<dl class="py method">
+<dt class="sig sig-object py" id="arc.autolinker.AutoLinker._calculate_dataset_entropy">
+<span class="sig-name descname"><span class="pre">_calculate_dataset_entropy</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attribute_columns</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">by_cluster</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">base</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.AutoLinker._calculate_dataset_entropy" title="Permalink to this definition">¶</a></dt>
+<dd><p>Method to calculate the average entropy of each attribute column in a dataset. Uses the custom arc_entropy_agg
+function from ARC’s SQL built-ins to efficiently calculate entropy across all columns.</p>
+<p>Returns a dictionary with keys as columns and values as entropy in the columns.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data</strong> (<em>pyspark.sql.dataframe.DataFrame</em>) – input dataframe with row per record</p></li>
+<li><p><strong>column</strong> – (valid) name of column to calculate entropy on</p></li>
+<li><p><strong>by_cluster</strong> (<em>bool</em>) – if True, it will calculate the average entropy when the dataset is split by clusters.</p></li>
+<li><p><strong>base</strong> (<em>int</em>) – base of the log in the entropy calculation</p></li>
+<li><p><strong>attribute_columns</strong> (<em>list</em>) – </p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>dict</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="arc.autolinker.AutoLinker._calculate_unsupervised_metrics">
+<span class="sig-name descname"><span class="pre">_calculate_unsupervised_metrics</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">clusters</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attribute_columns</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">base</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.AutoLinker._calculate_unsupervised_metrics" title="Permalink to this definition">¶</a></dt>
+<dd><p>Method to calculate the chosen metric for unsupervised optimisation, the power ratio of information gains when
+calculated using a base of the number of clusters and a base of the maximum number of unique values in any 
+columns in the original data. Information gain is defined as the difference in average entropy of clustered
+records when split and the entropy of the data points that are being matched.</p>
+<p>Let the number of clusters in the matched subset of the data be <span class="math notranslate nohighlight">\(c\)</span></p>
+<p>Let the maximum number of unique values in any column in the original dataset be <span class="math notranslate nohighlight">\(u\)</span></p>
+<p>Then the “scaled” entropy of column <span class="math notranslate nohighlight">\(k\)</span>, <span class="math notranslate nohighlight">\(N\)</span> unique values with probability <span class="math notranslate nohighlight">\(P\)</span> is</p>
+<p><span class="math notranslate nohighlight">\(E_{s,k} = -\Sigma_{i}^{N} P_{i} \log_{c}(P_{i})\)</span></p>
+<p>Then the “adjusted” entropy of column <span class="math notranslate nohighlight">\(k\)</span>, <span class="math notranslate nohighlight">\(N\)</span> unique values with probability <span class="math notranslate nohighlight">\(P\)</span> is</p>
+<p><span class="math notranslate nohighlight">\(E_{a,k} = -\Sigma_{i}^{N} P_{i} \log_{u}(P_{i})\)</span></p>
+<p>The scaled information gain is</p>
+<p><span class="math notranslate nohighlight">\(I_{s} = \Sigma_{k}^{K} E_{s,k} - E'_{s,k}\)</span></p>
+<p>and the adjusted information gain is</p>
+<p><span class="math notranslate nohighlight">\(I_{a} = \Sigma_{k}^{K} E_{a,k} - E'_{a,k}\)</span></p>
+<p>where <span class="math notranslate nohighlight">\(E'\)</span> is the mean entropy of the individual clusters predicted.</p>
+<p>The metric to optimise for is:</p>
+<p><span class="math notranslate nohighlight">\(I_{s}^{I_{a}}\)</span></p>
+<p>Returns information gain metric, as dictionary.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>clusters</strong> (<em>pyspark.sql.dataframe.DataFrame</em>) – dataframe returned from linker clustering</p></li>
+<li><p><strong>attribute_columns</strong> (<em>list</em>) – list of valid column names containing attributes in the clusters dataset</p></li>
+<li><p><strong>base</strong> (<em>int</em>) – the base for the log when calculating the adjusted entropy</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>dict</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="arc.autolinker.AutoLinker._clean_columns">
+<span class="sig-name descname"><span class="pre">_clean_columns</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attribute_columns</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cleaning</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'all'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.AutoLinker._clean_columns" title="Permalink to this definition">¶</a></dt>
+<dd><p>Method to clean string columns (turn them to lower case and remove non-alphanumeric characters)
+in order to help with better (and quicker) string-distance calculations. If cleaning is ‘all’
+(as is by default), it will automatically clean as much as it can.  If cleaning is ‘none’, it will do nothing.
+cleaning can also be a dictionary with keys as column names and values as lists of method strings.
+The currently available cleaning methods are turning to lower case and removing non-alphanumeric characters.</p>
+<p>Returns a Spark DataFrame.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data</strong> (<em>pyspark.sql.dataframe.DataFrame</em>) – DataFrame containing the data to be cleaned</p></li>
+<li><p><strong>attribute_columns</strong> (<em>list</em>) – all attribute columns</p></li>
+<li><p><strong>cleaning</strong> – string or dicitonary with keys as column names and values as list of valid cleaning method names.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="arc.autolinker.AutoLinker._convert_hyperopt_to_splink">
+<span class="sig-name descname"><span class="pre">_convert_hyperopt_to_splink</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.AutoLinker._convert_hyperopt_to_splink" title="Permalink to this definition">¶</a></dt>
+<dd><p>Method to convert hyperopt trials to a dictionary that can be used to
+train a linker model. Used for training the best linker model at the end of an experiment.
+Sets class attributes for best metric and parameters as well.
+Returns a dictionary.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>dict</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="arc.autolinker.AutoLinker._create_comparison_list">
+<span class="sig-name descname"><span class="pre">_create_comparison_list</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">space</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.AutoLinker._create_comparison_list" title="Permalink to this definition">¶</a></dt>
+<dd><p>Method to convert comparisons dictionary generated by hyperopt to a Splink-compatible list of
+spark_comparison_library functions with the generated columns and thresholds.</p>
+<p>Returns list of spark_comparison_library method instances.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>space</strong> (<em>dict</em>) – nested dicitonary generated by create_comparison_dict</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>list</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="arc.autolinker.AutoLinker._create_hyperopt_space">
+<span class="sig-name descname"><span class="pre">_create_hyperopt_space</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attribute_columns</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">comparison_size_limit</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_columns_per_and_rule</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_rules_per_or_rule</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">3</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.AutoLinker._create_hyperopt_space" title="Permalink to this definition">¶</a></dt>
+<dd><p>Method to create hyperopt space for comparison and blocking rule hyperparameters from list of columns.
+Takes a given (or generated) list of columns and produces a dictionary that can be converted to a comparison list later on,
+with function names and threhsolds, and a list (of lists) of blocking rules to test.</p>
+<p>Returns a dictionary for hyperopt parameter search</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data</strong> (<em>pyspark.sql.dataframe.DataFrame</em>) – input data with records per row</p></li>
+<li><p><strong>attribute_columns</strong> (<em>list</em>) – valid column names of data, containing all possible columns to compare</p></li>
+<li><p><strong>comparison_size_limit</strong> (<em>int</em>) – maximum number of pairs we want to compare, to limit hardware issues</p></li>
+<li><p><strong>max_columns_per_and_rule</strong> (<em>int</em>) – the maximum number of column comparisons in a single rule to try</p></li>
+<li><p><strong>max_rules_per_or_rule</strong> (<em>int</em>) – the maximum number of rules comparisons in a composite rule to try</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>dict</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="arc.autolinker.AutoLinker._do_clustering">
+<span class="sig-name descname"><span class="pre">_do_clustering</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.AutoLinker._do_clustering" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="arc.autolinker.AutoLinker._drop_intermediate_tables">
+<span class="sig-name descname"><span class="pre">_drop_intermediate_tables</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.AutoLinker._drop_intermediate_tables" title="Permalink to this definition">¶</a></dt>
+<dd><p>Method to drop intermediate tables for clean consecutive runs.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="arc.autolinker.AutoLinker._generate_candidate_blocking_rules">
+<span class="sig-name descname"><span class="pre">_generate_candidate_blocking_rules</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attribute_columns</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">comparison_size_limit</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_columns_per_and_rule</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_rules_per_or_rule</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">3</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.AutoLinker._generate_candidate_blocking_rules" title="Permalink to this definition">¶</a></dt>
+<dd><p>Method to automatically generate a list of lists of blocking rules to test, given a user-defined limit for
+pair-wise comparison size. Uses appriximated method built in to ARC’s SQL functions.</p>
+<p>Returns a nested list of lists with Splink-compatible blocking rule queries.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data</strong> (<em>pyspark.sql.dataframe.DataFrame</em>) – input data with record-per-row</p></li>
+<li><p><strong>attribute_columns</strong> (<em>list</em>) – valid column names of data, containing all possible columns to block on</p></li>
+<li><p><strong>comparison_size_limit</strong> (<em>int</em>) – the maximum number of pairs we want to compare, to limit hardware issues</p></li>
+<li><p><strong>max_columns_per_and_rule</strong> (<em>int</em>) – the maximum number of column comparisons in a single rule to try</p></li>
+<li><p><strong>max_rules_per_or_rule</strong> (<em>int</em>) – the maximum number of rules comparisons in a composite rule to try</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>list</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="arc.autolinker.AutoLinker._generate_rules">
+<span class="sig-name descname"><span class="pre">_generate_rules</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">columns</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.AutoLinker._generate_rules" title="Permalink to this definition">¶</a></dt>
+<dd><p>Method to create a list of Splink-compatible SQL statements from a list of candidate columns for rules.
+Can be used for simple blocking rules (no AND statement), deterministic rules or for training rules.</p>
+<p>Returns list of strings of Splink-compatible SQL statements.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>columns</strong> (<em>list</em>) – valid attribute columns in the data set</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>list</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="arc.autolinker.AutoLinker._randomise_columns">
+<span class="sig-name descname"><span class="pre">_randomise_columns</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">attribute_columns</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.AutoLinker._randomise_columns" title="Permalink to this definition">¶</a></dt>
+<dd><p>Method to randomly select (combinations of) columns from attribute columns for EM training.
+Will try to pick 2 combinations of 2 (i.e AB and BC from ABC), but will default to 2 if there are only 2.</p>
+<p>Returns list of lists of strings.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>attribute_columns</strong> (<em>list</em>) – list of strings containing all attribute columns</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>list</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="arc.autolinker.AutoLinker.auto_link">
+<span class="sig-name descname"><span class="pre">auto_link</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attribute_columns</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">unique_id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">comparison_size_limit</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_evals</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cleaning</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'all'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">threshold</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.9</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">true_label</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">random_seed</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">42</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">metric</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'information_gain_power_ratio'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.AutoLinker.auto_link" title="Permalink to this definition">¶</a></dt>
+<dd><p>Method to run a series of hyperopt trials.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data</strong> (<em>pyspark.sql.dataframe.DataFrame</em>) – Spark DataFrame containing the data to be de-duplicated</p></li>
+<li><p><strong>space</strong> – dictionary generated by hyperopt sampling</p></li>
+<li><p><strong>attribute_columns</strong> (<em>list</em>) – list of strings containing all attribute columns</p></li>
+<li><p><strong>unique_id</strong> (<em>str</em>) – string with the name of the unique ID column</p></li>
+<li><p><strong>comparison_size_limit</strong> (<em>int</em>) – int denoting maximum size of pairs allowed after blocking</p></li>
+<li><p><strong>max_evals</strong> (<em>int</em>) – int denoting max number of hyperopt trials to run</p></li>
+<li><p><strong>cleaning</strong> – string (“all” or “none”) or dictionary with keys as column names and values as list of strings for methods (accepted are “lower” and “alphanumeric_only”)</p></li>
+<li><p><strong>threshold</strong> (<em>float</em>) – float indicating the probability threshold above which a pair is considered a match</p></li>
+<li><p><strong>true_label</strong> (<em>Optional</em><em>[</em><em>str</em><em>]</em>) – The name of the column with true record ids, if exists (default None) - if not None, auto_link will attempt to calculate empirical scores</p></li>
+<li><p><strong>random_seed</strong> (<em>int</em>) – Seed for Hyperopt fmin</p></li>
+<li><p><strong>metric</strong> (<em>str</em>) – </p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="arc.autolinker.AutoLinker.best_clusters_at_threshold">
+<span class="sig-name descname"><span class="pre">best_clusters_at_threshold</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">threshold</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.8</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.AutoLinker.best_clusters_at_threshold" title="Permalink to this definition">¶</a></dt>
+<dd><p>Convert the pairwise predictions to clusters using the connected components algorithm.</p>
+<p>Parameters
+:param threshold: default value=0.8.An optional parameter controlling the threshold at which records will be connected. Set it higher to produce clusters with greater precision, lower to produce clusters with greater recall.</p>
+<p>Returns a spark dataframe of the clustered input data with a new column cluster_id prepended.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>threshold</strong> (<em>float</em>) – </p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>pyspark.sql.dataframe.DataFrame</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="arc.autolinker.AutoLinker.best_predictions">
+<span class="sig-name descname"><span class="pre">best_predictions</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.AutoLinker.best_predictions" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get the predictions from the best linker model trained.
+Returns a spark dataframe of the pairwise predictions made by the autolinker model.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="arc.autolinker.AutoLinker.cluster_viewer">
+<span class="sig-name descname"><span class="pre">cluster_viewer</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.AutoLinker.cluster_viewer" title="Permalink to this definition">¶</a></dt>
+<dd><p>Produce an interactive dashboard for visualising clusters. It provides examples of clusters of different sizes.
+The shape and size of clusters can be indicative of problems with record linkage, so it provides a tool to help you
+find potential false positive and negative links.
+See this video for an indepth explanation of interpreting this dashboard: <a class="reference external" href="https://www.youtube.com/watch?v=DNvCMqjipis">https://www.youtube.com/watch?v=DNvCMqjipis</a></p>
+<p>Writes a HTML file to DBFS at “/dbfs/Users/{username}/scv.html”</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="arc.autolinker.AutoLinker.comparison_viewer">
+<span class="sig-name descname"><span class="pre">comparison_viewer</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.AutoLinker.comparison_viewer" title="Permalink to this definition">¶</a></dt>
+<dd><p>Produce an interactive dashboard for querying comparison details.
+See this video for an indepth explanation of interpreting this dashboard: <a class="reference external" href="https://www.youtube.com/watch?v=DNvCMqjipis">https://www.youtube.com/watch?v=DNvCMqjipis</a></p>
+<p>Writes a HTML file to DBFS at “/dbfs/Users/{username}/scv.html”</p>
+<p>Returns None.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="arc.autolinker.AutoLinker.evaluate_linker">
+<span class="sig-name descname"><span class="pre">evaluate_linker</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">predictions</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">threshold</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attribute_columns</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">unique_id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">linker</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">true_label</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.AutoLinker.evaluate_linker" title="Permalink to this definition">¶</a></dt>
+<dd><p>Method to evaluate predictions made by a trained linker model.</p>
+<p>Returns a dictionary of evaluation metrics.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data</strong> (<em>pyspark.sql.dataframe.DataFrame</em>) – Spark Dataframe containing the original dataset (required to establish ground truth labels)</p></li>
+<li><p><strong>predictions</strong> (<em>splink.splink_dataframe.SplinkDataFrame</em>) – Splink DataFrame as a result of calling linker.predict()</p></li>
+<li><p><strong>threshold</strong> (<em>float</em>) – float indicating the probability threshold above which a pair is considered a match</p></li>
+<li><p><strong>attribute_columns</strong> (<em>list</em>) – list of strings with valid column names to compare the entropies of</p></li>
+<li><p><strong>unique_id</strong> (<em>str</em>) – string with the name of the unique ID column</p></li>
+<li><p><strong>linker</strong> (<em>splink.spark.linker.SparkLinker</em>) – isntance of splink.SparkLinker, used for deduplication (clustering)</p></li>
+<li><p><strong>true_label</strong> (<em>Optional</em><em>[</em><em>str</em><em>]</em>) – The name of the column with true record ids, if exists (default None) - if not None, auto_link will attempt to calculate empirical scores</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>dict</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="arc.autolinker.AutoLinker.get_PR_count">
+<span class="sig-name descname"><span class="pre">get_PR_count</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">scores_df</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">unique_id</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.AutoLinker.get_PR_count" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="arc.autolinker.AutoLinker.get_RR_count">
+<span class="sig-name descname"><span class="pre">get_RR_count</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data_df</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">unique_id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">true_label</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.AutoLinker.get_RR_count" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="arc.autolinker.AutoLinker.get_best_splink_model">
+<span class="sig-name descname"><span class="pre">get_best_splink_model</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.AutoLinker.get_best_splink_model" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get the underlying Splink model from the MLFlow Model Registry. Useful for advanced users wishing to access Splink’s
+internal functionality not exposed as part of arc Autolinker.
+Returns
+——-
+A Splink model object.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="arc.autolinker.AutoLinker.get_clustering_metrics">
+<span class="sig-name descname"><span class="pre">get_clustering_metrics</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">clusters</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">true_label</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.AutoLinker.get_clustering_metrics" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="arc.autolinker.AutoLinker.get_confusion_metrics">
+<span class="sig-name descname"><span class="pre">get_confusion_metrics</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data_df</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">predictions_df</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">thld</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">unique_id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">true_label</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.AutoLinker.get_confusion_metrics" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="arc.autolinker.AutoLinker.get_scores_df">
+<span class="sig-name descname"><span class="pre">get_scores_df</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data_df</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">predictions_df</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">unique_id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">true_label</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.AutoLinker.get_scores_df" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="arc.autolinker.AutoLinker.match_weights_chart">
+<span class="sig-name descname"><span class="pre">match_weights_chart</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.AutoLinker.match_weights_chart" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get the match_weights_chart</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="arc.autolinker.AutoLinker.train_and_evaluate_linker">
+<span class="sig-name descname"><span class="pre">train_and_evaluate_linker</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">space</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attribute_columns</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">unique_id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">deterministic_columns</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">training_columns</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">threshold</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.9</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">true_label</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.AutoLinker.train_and_evaluate_linker" title="Permalink to this definition">¶</a></dt>
+<dd><p>Method to train and evaluate a linker model in one go</p>
+<p>Returns a tuple of trained linker, predictions, metrics, parameters and mlflow run_id</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data</strong> (<em>pyspark.sql.dataframe.DataFrame</em>) – Spark DataFrame containing the data to be de-duplicated</p></li>
+<li><p><strong>space</strong> (<em>dict</em>) – dictionary generated by hyperopt sampling</p></li>
+<li><p><strong>attribute_columns</strong> (<em>list</em>) – list of strings containing all attribute columns</p></li>
+<li><p><strong>unique_id</strong> (<em>str</em>) – string with the name of the unique ID column</p></li>
+<li><p><strong>columns</strong> (<em>deterministic</em>) – list of strings containint columns to block on - if None, they will be generated automatically/randomly</p></li>
+<li><p><strong>training_columns</strong> (<em>Optional</em><em>[</em><em>list</em><em>]</em>) – list of strings containing training columns - if None, they will be generated automatically/randomly</p></li>
+<li><p><strong>threshold</strong> (<em>float</em>) – float indicating the probability threshold above which a pair is considered a match</p></li>
+<li><p><strong>true_label</strong> (<em>Optional</em><em>[</em><em>str</em><em>]</em>) – The name of the column with true record ids, if exists (default None) - if not None, auto_link will attempt to calculate empirical scores</p></li>
+<li><p><strong>deterministic_columns</strong> (<em>Optional</em><em>[</em><em>list</em><em>]</em>) – </p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p><em>Tuple</em>[splink.spark.linker.SparkLinker, splink.splink_dataframe.SplinkDataFrame, dict, dict, str]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="arc.autolinker.AutoLinker.train_linker">
+<span class="sig-name descname"><span class="pre">train_linker</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">space</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attribute_columns</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">unique_id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">training_columns</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.AutoLinker.train_linker" title="Permalink to this definition">¶</a></dt>
+<dd><p>Method to train a linker model.</p>
+<p>Returns a 2-tuple of trained linker object and Splink dataframe with predictions</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data</strong> (<em>pyspark.sql.dataframe.DataFrame</em>) – Spark DataFrame containing the data to be de-duplicated</p></li>
+<li><p><strong>space</strong> (<em>dict</em>) – dictionary generated by hyperopt sampling</p></li>
+<li><p><strong>attribute_columns</strong> (<em>list</em>) – list of strings containing all attribute columns</p></li>
+<li><p><strong>unique_id</strong> (<em>str</em>) – string with the name of the unique ID column</p></li>
+<li><p><strong>training_columns</strong> (<em>Optional</em><em>[</em><em>list</em><em>]</em>) – list of strings containing training columns</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p><em>Tuple</em>[splink.spark.linker.SparkLinker, splink.splink_dataframe.SplinkDataFrame]</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="section" id="mlflow-utilities">
+<h2>MLflow utilities<a class="headerlink" href="#mlflow-utilities" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="wrapper-classes">
+<h3>Wrapper classes<a class="headerlink" href="#wrapper-classes" title="Permalink to this headline">¶</a></h3>
+<dl class="py class">
+<dt class="sig sig-object py" id="arc.autolinker.splink_mlflow.splinkSparkMLFlowWrapper">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">arc.autolinker.splink_mlflow.</span></span><span class="sig-name descname"><span class="pre">splinkSparkMLFlowWrapper</span></span><a class="headerlink" href="#arc.autolinker.splink_mlflow.splinkSparkMLFlowWrapper" title="Permalink to this definition">¶</a></dt>
+<dd><p>Wrapper class necessary for storing and retrieving the splink model JSON from the MLFlow model repository.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="arc.autolinker.splink_mlflow.splinkSparkMLFlowWrapper.load_context">
+<span class="sig-name descname"><span class="pre">load_context</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">context</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.splink_mlflow.splinkSparkMLFlowWrapper.load_context" title="Permalink to this definition">¶</a></dt>
+<dd><p>Loads linker settings json into context</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>context</strong> (<em>mlflow.pyfunc.model.PythonModelContext</em>) – Python Model context instance</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="arc.autolinker.splink_mlflow.SplinkMLFlowWrapper">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">arc.autolinker.splink_mlflow.</span></span><span class="sig-name descname"><span class="pre">SplinkMLFlowWrapper</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.splink_mlflow.SplinkMLFlowWrapper" title="Permalink to this definition">¶</a></dt>
+<dd><p>MLFlow compatibility wrapper for splink linker.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="arc.autolinker.splink_mlflow.SplinkMLFlowWrapper.clear_context">
+<span class="sig-name descname"><span class="pre">clear_context</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.splink_mlflow.SplinkMLFlowWrapper.clear_context" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="arc.autolinker.splink_mlflow.SplinkMLFlowWrapper.get_linker">
+<span class="sig-name descname"><span class="pre">get_linker</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.splink_mlflow.SplinkMLFlowWrapper.get_linker" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="arc.autolinker.splink_mlflow.SplinkMLFlowWrapper.get_settings">
+<span class="sig-name descname"><span class="pre">get_settings</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.splink_mlflow.SplinkMLFlowWrapper.get_settings" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="arc.autolinker.splink_mlflow.SplinkMLFlowWrapper.get_settings_object">
+<span class="sig-name descname"><span class="pre">get_settings_object</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.splink_mlflow.SplinkMLFlowWrapper.get_settings_object" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="arc.autolinker.splink_mlflow.SplinkMLFlowWrapper.load_context">
+<span class="sig-name descname"><span class="pre">load_context</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">context</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.splink_mlflow.SplinkMLFlowWrapper.load_context" title="Permalink to this definition">¶</a></dt>
+<dd><p>Loads artifacts from the specified <code class="xref py py-class docutils literal notranslate"><span class="pre">PythonModelContext</span></code> that can be used by
+<code class="xref py py-func docutils literal notranslate"><span class="pre">predict()</span></code> when evaluating inputs. When loading an MLflow model with
+<code class="xref py py-func docutils literal notranslate"><span class="pre">load_model()</span></code>, this method is called as soon as the <code class="xref py py-class docutils literal notranslate"><span class="pre">PythonModel</span></code> is
+constructed.</p>
+<p>The same <code class="xref py py-class docutils literal notranslate"><span class="pre">PythonModelContext</span></code> will also be available during calls to
+<code class="xref py py-func docutils literal notranslate"><span class="pre">predict()</span></code>, but it may be more efficient to override this method
+and load artifacts from the context at model load time.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>context</strong> – A <code class="xref py py-class docutils literal notranslate"><span class="pre">PythonModelContext</span></code> instance containing artifacts that the model
+can use to perform inference.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="arc.autolinker.splink_mlflow.SplinkMLFlowWrapper.predict">
+<span class="sig-name descname"><span class="pre">predict</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">context</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">X</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.splink_mlflow.SplinkMLFlowWrapper.predict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Predict labels on provided data</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="arc.autolinker.splink_mlflow.SplinkMLFlowWrapper.set_settings">
+<span class="sig-name descname"><span class="pre">set_settings</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">settings</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.splink_mlflow.SplinkMLFlowWrapper.set_settings" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="arc.autolinker.splink_mlflow.SplinkMLFlowWrapper.set_should_evaluate">
+<span class="sig-name descname"><span class="pre">set_should_evaluate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">flag</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.splink_mlflow.SplinkMLFlowWrapper.set_should_evaluate" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="arc.autolinker.splink_mlflow.SplinkMLFlowWrapper.set_spark_linker">
+<span class="sig-name descname"><span class="pre">set_spark_linker</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">linker</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.splink_mlflow.SplinkMLFlowWrapper.set_spark_linker" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>linker</strong> (<em>splink.spark.linker.SparkLinker</em>) – </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="arc.autolinker.splink_mlflow.SplinkMLFlowWrapper.spark_linker">
+<span class="sig-name descname"><span class="pre">spark_linker</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.splink_mlflow.SplinkMLFlowWrapper.spark_linker" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="section" id="utility-functions">
+<h3>Utility functions<a class="headerlink" href="#utility-functions" title="Permalink to this headline">¶</a></h3>
+<dl class="py function">
+<dt class="sig sig-object py" id="arc.autolinker.splink_mlflow._log_comparison_details">
+<span class="sig-prename descclassname"><span class="pre">arc.autolinker.splink_mlflow.</span></span><span class="sig-name descname"><span class="pre">_log_comparison_details</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">comparison</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.splink_mlflow._log_comparison_details" title="Permalink to this definition">¶</a></dt>
+<dd><p>Traverse a single comparison item from the splink settings JSON and log the sql condition the comparison was made
+under and the m and u values</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>comparison</strong> (<em>dict</em>) – dictionary element from a Splink settings object</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="arc.autolinker.splink_mlflow._log_comparisons">
+<span class="sig-prename descclassname"><span class="pre">arc.autolinker.splink_mlflow.</span></span><span class="sig-name descname"><span class="pre">_log_comparisons</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">splink_model_json</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.splink_mlflow._log_comparisons" title="Permalink to this definition">¶</a></dt>
+<dd><p>Traverse the comparisons part of the splink settings and extract the learned values.
+This allows you to easily compare values across different training conditions.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>splink_model_json</strong> (<em>dict</em>) – the settings json from a splink model.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="arc.autolinker.splink_mlflow._log_hyperparameters">
+<span class="sig-prename descclassname"><span class="pre">arc.autolinker.splink_mlflow.</span></span><span class="sig-name descname"><span class="pre">_log_hyperparameters</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">splink_model_json</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.splink_mlflow._log_hyperparameters" title="Permalink to this definition">¶</a></dt>
+<dd><p>Simple method for extracting parameters from the splink settings and logging as parameters in MLFlow</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>splink_model_json</strong> (<em>dict</em>) – the settings json from a splink model.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="arc.autolinker.splink_mlflow._log_splink_model_json">
+<span class="sig-prename descclassname"><span class="pre">arc.autolinker.splink_mlflow.</span></span><span class="sig-name descname"><span class="pre">_log_splink_model_json</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">splink_model_json</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.splink_mlflow._log_splink_model_json" title="Permalink to this definition">¶</a></dt>
+<dd><p>Log the splink settings json in its entirery under the name “linker.json”</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>splink_model_json</strong> (<em>dict</em>) – the settings json from a splink model.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="arc.autolinker.splink_mlflow._save_splink_model_to_mlflow">
+<span class="sig-prename descclassname"><span class="pre">arc.autolinker.splink_mlflow.</span></span><span class="sig-name descname"><span class="pre">_save_splink_model_to_mlflow</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">linker</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model_name</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.splink_mlflow._save_splink_model_to_mlflow" title="Permalink to this definition">¶</a></dt>
+<dd><p>Simple method for logging a splink model</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>linker</strong> (<em>splink.spark.linker.SparkLinker</em>) – Splink model object</p></li>
+<li><p><strong>model_name</strong> (<em>str</em>) – name to save model under</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="arc.autolinker.splink_mlflow.log_splink_model_to_mlflow">
+<span class="sig-prename descclassname"><span class="pre">arc.autolinker.splink_mlflow.</span></span><span class="sig-name descname"><span class="pre">log_splink_model_to_mlflow</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">linker</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log_parameters_charts</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log_profiling_charts</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">params</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">metrics</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">artifacts</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.splink_mlflow.log_splink_model_to_mlflow" title="Permalink to this definition">¶</a></dt>
+<dd><p>Comprehensive logging of Splink attributes, parameters, charts and model JSON to MLFlow to provide easy
+reproducability and tracking during model development and deployment. This will create a new run under which
+to log everything. Additional parameters and metrics can be logged through the params and metrics arguments.</p>
+<p>For details on MLFlow please visit <a class="reference external" href="https://mlflow.org/">https://mlflow.org/</a>.</p>
+<p>This will log
+- All the m and u values trained along with their training condition
+- All the hyperparameters set during training (blocking rules, link type, sql_dialect etc)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>run</strong> – an mlflow.start_run() instance</p></li>
+<li><p><strong>linker</strong> (<em>splink.spark.linker.SparkLinker</em>) – a trained Splink linkage model</p></li>
+<li><p><strong>model_name</strong> (<em>str</em>) – str, the name to log the model under</p></li>
+<li><p><strong>log_parameters_charts</strong> (<em>bool</em>) – boolean, whether to log parameter charts or not. Default to True as this is a quick operation.</p></li>
+<li><p><strong>log_profiling_charts</strong> (<em>bool</em>) – boolean, whether to log data profiling charts or not. Default to False as this requires running Spark jobs and can take time.</p></li>
+<li><p><strong>params</strong> (<em>Optional</em><em>[</em><em>dict</em><em>]</em>) – dict[str: str]. Dictionary is of param_name :param_value. Optional argument for logging arbitrary parameters</p></li>
+<li><p><strong>metrics</strong> (<em>Optional</em><em>[</em><em>dict</em><em>]</em>) – dict[str: double or int]. Dictionary is of metric_name :metric_value. Optional argument for logging arbitrary metrics</p></li>
+<li><p><strong>artifacts</strong> (<em>Optional</em><em>[</em><em>dict</em><em>]</em>) – dict[str: str]. Dictionary is of artifact_name :artifact_filepath. Optional argument for logging arbitrary artifacts (NB - artifacts must be written to disk before logging).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="arc.autolinker.splink_mlflow._log_linker_charts">
+<span class="sig-prename descclassname"><span class="pre">arc.autolinker.splink_mlflow.</span></span><span class="sig-name descname"><span class="pre">_log_linker_charts</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">linker</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log_parameters_charts</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log_profiling_charts</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.splink_mlflow._log_linker_charts" title="Permalink to this definition">¶</a></dt>
+<dd><p>Log all the non-data related charts to MLFlow</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>linker</strong> (<em>splink.spark.linker.SparkLinker</em>) – a Splink linker object</p></li>
+<li><p><strong>log_parameters_charts</strong> (<em>bool</em>) – boolean, whether to log parameter charts or not</p></li>
+<li><p><strong>log_profiling_charts</strong> (<em>bool</em>) – boolean, whether to log data profiling charts or not</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="arc.autolinker.splink_mlflow._log_chart">
+<span class="sig-prename descclassname"><span class="pre">arc.autolinker.splink_mlflow.</span></span><span class="sig-name descname"><span class="pre">_log_chart</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">chart_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">chart</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.splink_mlflow._log_chart" title="Permalink to this definition">¶</a></dt>
+<dd><p>Save a chart to MLFlow. This writes the chart out temporarily for MLFlow to pick up and save.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>chart_name</strong> (<em>str</em>) – the name the chart will be given in MLFlow</p></li>
+<li><p><strong>chart</strong> – chart object from Splink</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="arc.autolinker.splink_mlflow.get_model_json">
+<span class="sig-prename descclassname"><span class="pre">arc.autolinker.splink_mlflow.</span></span><span class="sig-name descname"><span class="pre">get_model_json</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">artifact_uri</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.splink_mlflow.get_model_json" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a Splink model JSON from a model tracked with MLFlow. This can be retrieved either from a run or
+from the MLFlow Model Registry, if and only if the model was logged to MLFlow using the method
+splink.mlflow.log_splink_model_to_mlflow().</p>
+<p>Extracting the linker’s JSON specification requires temporarily writing to /tmp on the local file system. All
+written files are deleted before the function returns.</p>
+<p>Returns a splink setting json as a python dict.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>artifact_uri</strong> (<em>str</em>) – URI pointing to the artifacts, such as “runs:/500cf58bee2b40a4a82861cc31a617b1/my_model.pkl”, “models:/my_model/Production”, or “s3://my_bucket/my/file.txt”.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>dict</p>
+</dd>
+</dl>
+</dd></dl>
+
+</div>
+</div>
+</div>
+<div class="section" id="indices-and-tables">
+<h1>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Permalink to this headline">¶</a></h1>
+<ul class="simple">
+<li><p><a class="reference internal" href="genindex.html"><span class="std std-ref">Index</span></a></p></li>
+<li><p><a class="reference internal" href="search.html"><span class="std std-ref">Search Page</span></a></p></li>
+</ul>
+</div>
+<div class="section" id="project-support">
+<h1>Project Support<a class="headerlink" href="#project-support" title="Permalink to this headline">¶</a></h1>
+<p>Please note that all projects in the <code class="docutils literal notranslate"><span class="pre">industry-solutions</span></code> github space are provided for your exploration only, and are not formally supported by Databricks with Service Level Agreements (SLAs). They are provided AS-IS and we do not make any guarantees of any kind. Please do not submit a support ticket relating to any issues arising from the use of these projects.</p>
+<p>Any issues discovered through the use of this project should be filed as GitHub Issues on the Repo. They will be reviewed as time permits, but there are no formal SLAs for support.</p>
+</div>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+    
+        <div id="show_right_sidebar">
+            <p><a class="toggle_right_sidebar" href="#"><span class="icon">&lt;</span><span>Page contents<span></a></p>
+        </div>
+
+        <div id="right_sidebar">
+            <p><a class="toggle_right_sidebar" href="#"><span class="icon">&gt;</span><span>Page contents:<span></a></p>
+            <div class="page_toc">
+                <ul>
+<li><a class="reference internal" href="#">Documentation</a><ul>
+<li><a class="reference internal" href="#autolinker">AutoLinker</a></li>
+<li><a class="reference internal" href="#mlflow-utilities">MLflow utilities</a><ul>
+<li><a class="reference internal" href="#wrapper-classes">Wrapper classes</a></li>
+<li><a class="reference internal" href="#utility-functions">Utility functions</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#indices-and-tables">Indices and tables</a></li>
+<li><a class="reference internal" href="#project-support">Project Support</a></li>
+</ul>
+
+            </div>
+        </div>
+    
+
+      <div class="clearer"></div>
+    </div>
+    <div class="button_nav_wrapper">
+        <div class="button_nav">
+            <div class="left">
+                
+            </div>
+
+            <div class="right">
+                
+            </div>
+        </div>
+    </div>
+
+
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2022, Databricks Inc.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 4.4.0.
+    </div>
+
+<p id="theme_credit">Styled using the <a href="https://github.com/piccolo-orm/piccolo_theme">Piccolo Theme</a></p>
+  </body>
+</html>
