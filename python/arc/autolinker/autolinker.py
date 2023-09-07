@@ -18,6 +18,9 @@ import hyperopt
 from hyperopt import fmin, tpe, hp, STATUS_OK, Trials
 
 from . import splink_mlflow
+from . import arc_comparison_library as acl
+
+from sentence_transformers import SentenceTransformer
 
 import numpy as np
 import math
@@ -284,6 +287,7 @@ class AutoLinker:
     data:pyspark.sql.DataFrame,
     attribute_columns:list,
     comparison_size_limit:int,
+    description_columns:list,
     max_columns_per_and_rule:int=2,
     max_rules_per_or_rule:int=3
   ) -> dict:
@@ -328,6 +332,15 @@ class AutoLinker:
                 {"distance_function": "jaro_winkler", "threshold": hp.uniform(f"{column}|jaro_winkler|threshold", 0.7, 0.99)}
               ]
             )
+          }
+        }
+      )
+
+    for column in description_columns:
+      comparison_space.update(
+        {
+          column: {
+            "distance_function": "cos_sim", "threshold": hp.uniform(f"{column}|cos_sim|threshold", 0.7, 0.99)
           }
         }
       )
@@ -473,6 +486,8 @@ class AutoLinker:
         comparison_list.append(cl.jaccard_at_thresholds(column, threshold))
       elif distance_function=="jaro_winkler":
         comparison_list.append(cl.jaro_winkler_at_thresholds(column, threshold))
+      elif distance_function=="cos_sim":
+        comparison_list.append(acl.generate_custom_rule(f"_vector_{column}", threshold, distance_function))
       else:
         raise ValueError(f"Unknown distance function {distance_function} passed.")
 
@@ -505,6 +520,25 @@ class AutoLinker:
     
     return training_columns
   
+
+  def _register_embedding_udf(
+      self,
+      model_id:str
+  ):
+    """
+    Method to register an embedding UDF to be applied to free-text columns
+    Returns nothing.
+
+    :param model_id: string ID of Huggingface model to download and use for embedding.
+    """
+    @F.udf(returnType=ArrayType(FloatType()))
+    def embedding_udf(d):
+      model = SentenceTransformer('paraphrase-distilroberta-base-v1')
+      embeddings = model.encode(d)
+
+      return embeddings.tolist()
+    
+
 
   def train_linker(
     self,
@@ -641,6 +675,7 @@ class AutoLinker:
     deterministic_columns:list=None,
     training_columns:list=None,
     threshold:float=0.9,
+    description_columns:list=[],
     true_label:str=None
     ) -> typing.Tuple[
       splink.spark.spark_linker.SparkLinker,
@@ -660,6 +695,7 @@ class AutoLinker:
     :param unique_id: string with the name of the unique ID column
     :param deterministic columns: list of strings containint columns to block on - if None, they will be generated automatically/randomly
     :param training_columns: list of strings containing training columns - if None, they will be generated automatically/randomly
+    :param description_columns: list of columns containing free-text descriptions
     :param threshold: float indicating the probability threshold above which a pair is considered a match
     :param true_label: The name of the column with true record ids, if exists (default None) - if not None, auto_link will attempt to calculate empirical scores
     """
@@ -668,7 +704,7 @@ class AutoLinker:
     start = datetime.now()
     
     # Train model
-    linker, predictions = self.train_linker(data, space, attribute_columns, unique_id, training_columns)
+    linker, predictions = self.train_linker(data, space, attribute_columns, unique_id, training_columns, description_columns)
 
     end = datetime.now()
 
@@ -701,6 +737,8 @@ class AutoLinker:
     max_evals:int,
     cleaning="all",
     threshold:float=0.9,
+    description_columns:list=[],
+    embedding_model_id:str="paraphrase-distilroberta-base-v1",
     true_label:str=None,
     random_seed:int=42,
     metric:str="information_gain_power_ratio"
@@ -717,10 +755,16 @@ class AutoLinker:
     :param max_evals: int denoting max number of hyperopt trials to run
     :param cleaning: string ("all" or "none") or dictionary with keys as column names and values as list of strings for methods (accepted are "lower" and "alphanumeric_only")
     :param threshold: float indicating the probability threshold above which a pair is considered a match
+    :param description_columns: list of columns containing free-text descriptions
+    :param embedding_model_id: Huggingface Hub ID of pretrained embedding model to embed freetext columns
     :param true_label: The name of the column with true record ids, if exists (default None) - if not None, auto_link will attempt to calculate empirical scores
     :param random_seed: Seed for Hyperopt fmin
     """
     
+    # Check if reserved prefix is in any columns
+    if any([col[:8]=="_vector_" for col in attribute_columns]) | any([col[:8]=="_vector_" for col in description_columns]):
+      raise ValueError("Some column names passed begin with '_vector_' which is reserved by ARC. Please rename the columns before proceeding.")
+
     # extract spark from input data
 
     self.spark = data.sparkSession if not self.spark else self.spark
@@ -738,6 +782,14 @@ class AutoLinker:
     
     # Clean the data
     data = self._clean_columns(data, attribute_columns, cleaning)
+
+    # If there are description (free-text) columns, embed them
+    if len(description_columns)>0:
+      self._register_embedding_udf(embedding_model_id)
+      
+      for description_col in description_columns:
+        data = data.withColumn(f"_vector_{description_col}", embedding_udf(description_col))
+    
     
     # define objective function
     def tune_model(space):
@@ -749,6 +801,8 @@ class AutoLinker:
         deterministic_columns=self.deterministic_columns,
         training_columns=self.training_columns,
         threshold=threshold,
+        description_columns=description_columns,
+        embedding_model_id=embedding_model_id,
         true_label=true_label
       )
       
@@ -762,7 +816,7 @@ class AutoLinker:
     
     # initialise trials and create hyperopt space
     self.trials = Trials()
-    space = self._create_hyperopt_space(data, attribute_columns, comparison_size_limit)
+    space = self._create_hyperopt_space(data, attribute_columns, comparison_size_limit, description_columns)
     
       # run hyperopt trials
     self.best = fmin(
