@@ -11,7 +11,7 @@ runs:
       shell: bash
       run: |
         cd python
-        pip install mlflow>=2.2.2 splink>=3.5.4 hyperopt>=0.2.5
+        pip install mlflow>=2.2.2 splink>=3.5.4 hyperopt>=0.2.5 sentence-transformers==2.2.2
         pip install build wheel pyspark==${{ matrix.spark }}
         pip install .
     - name: Test and build python package
