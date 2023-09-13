@@ -52,7 +52,7 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install --quiet databricks-arc splink
+# MAGIC %pip install --quiet databricks-arc splink sentence-transformers
 
 # COMMAND ----------
 
