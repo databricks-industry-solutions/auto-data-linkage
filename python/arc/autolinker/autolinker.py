@@ -508,7 +508,7 @@ class AutoLinker:
 
   def train_linker(
     self,
-    data:pyspark.sql.DataFrame,
+    data: typing.Union[pyspark.sql.dataframe.DataFrame, list],
     space:dict,
     attribute_columns:list,
     unique_id:str,
@@ -556,7 +556,7 @@ class AutoLinker:
     settings = {
       "retain_intermediate_calculation_columns": True,
       "retain_matching_columns": True,
-      "link_type": "dedupe_only",
+      "link_type": self.linker_mode,
       "unique_id_column_name": unique_id,
       "comparisons": comparisons,
       "em_convergence": 0.01,
@@ -564,7 +564,10 @@ class AutoLinker:
     }
 
     # Train linker model
-    linker = SparkLinker(data, spark=self.spark, database=self.schema, catalog=self.catalog)
+    if self.linker_mode == "dedupe_only":
+      linker = SparkLinker(data, spark=self.spark, database=self.schema, catalog=self.catalog)
+    else:
+      linker = SparkLinker(data, spark=self.spark, database=self.schema, catalog=self.catalog, input_table_aliases=["df_left", "df_right"])
     
     linker.load_settings(settings)
     linker._settings_obj._probability_two_random_records_match = 1/self.data_rowcount
@@ -582,7 +585,7 @@ class AutoLinker:
   
   def evaluate_linker(
     self,
-    data:pyspark.sql.DataFrame,
+    data: typing.Union[pyspark.sql.dataframe.DataFrame, list],
     predictions:splink.splink_dataframe.SplinkDataFrame,
     threshold:float,
     attribute_columns:list,
@@ -607,7 +610,17 @@ class AutoLinker:
     
     # Cluster records that are matched above threshold
     # get adjusted base
-    k = max([data.groupBy(cn).count().count() for cn in attribute_columns])
+    if self.linker_mode == "dedupe_only":
+      k = max([data.groupBy(cn).count().count() for cn in attribute_columns])
+    else:
+      # use the larger dataframe as baseline
+      df0_size = data[0].count()
+      df1_size = data[1].count()
+      if df0_size < df1_size:
+        k = max([data[1].groupBy(cn).count().count() for cn in attribute_columns])
+      else:
+        k = max([data[0].groupBy(cn).count().count() for cn in attribute_columns])
+
     clusters = linker.cluster_pairwise_predictions_at_threshold(predictions, threshold_match_probability=threshold)
     df_clusters = clusters.as_spark_dataframe()
     
@@ -634,7 +647,7 @@ class AutoLinker:
   
   def train_and_evaluate_linker(
     self,
-    data:pyspark.sql.DataFrame,
+    data: typing.Union[pyspark.sql.dataframe.DataFrame, list],
     space:dict,
     attribute_columns:list,
     unique_id:str,
@@ -690,11 +703,9 @@ class AutoLinker:
     run_id = run.info.run_id
     return linker, predictions, evals, params, run_id
 
-  
-  
   def auto_link(
     self,
-    data:pyspark.sql.DataFrame,
+    data: typing.Union[pyspark.sql.dataframe.DataFrame, list],
     attribute_columns:list,
     unique_id:str,
     comparison_size_limit:int,
@@ -720,10 +731,32 @@ class AutoLinker:
     :param true_label: The name of the column with true record ids, if exists (default None) - if not None, auto_link will attempt to calculate empirical scores
     :param random_seed: Seed for Hyperopt fmin
     """
-    
-    # extract spark from input data
 
-    self.spark = data.sparkSession if not self.spark else self.spark
+    # evaluate input argument of data
+    _data_error_message = "The data argument accepts a single spark dataframe for deduplication, or a list of 2 " \
+                          "spark dataframes for linking"
+    if type(data) not in set([pyspark.sql.dataframe.DataFrame, list]):
+      raise ValueError(_data_error_message)
+    if type(data) is list:
+      data_len = len(data)
+      data_types = {type(x) for x in data}
+      if data_len != 2:
+        raise ValueError(_data_error_message)
+      if len(data_types) != 1:
+        raise ValueError(_data_error_message)
+      if data_types.pop() != pyspark.sql.dataframe.DataFrame:
+        raise ValueError(_data_error_message)
+
+    # set autolinker mode based on input data arg
+    if type(data) == list:
+      self.linker_mode = "link_only"
+    else:
+      self.linker_mode = "dedupe_only"
+    # extract spark from input data
+    if type(data) == list:
+      self.spark = data[0].sparkSession if not self.spark else self.spark
+    else:
+      self.spark = data.sparkSession if not self.spark else self.spark
     self.catalog = self.catalog if self.catalog else self.spark.catalog.currentCatalog()
     self.schema = self.schema   if self.schema else self.spark.catalog.currentDatabase()
     
