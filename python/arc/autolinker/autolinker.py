@@ -807,7 +807,17 @@ class AutoLinker:
     
     # initialise trials and create hyperopt space
     self.trials = Trials()
-    space = self._create_hyperopt_space(data, attribute_columns, comparison_size_limit)
+    if self.linker_mode == "dedupe_only":
+      space = self._create_hyperopt_space(data, attribute_columns, comparison_size_limit)
+    else:
+      # use the larger dataframe as baseline
+      df0_size = data[0].count()
+      df1_size = data[1].count()
+      if df0_size < df1_size:
+        space = self._create_hyperopt_space(data[1], attribute_columns, comparison_size_limit)
+      else:
+        space = self._create_hyperopt_space(data[0], attribute_columns, comparison_size_limit)
+
     
       # run hyperopt trials
     self.best = fmin(
