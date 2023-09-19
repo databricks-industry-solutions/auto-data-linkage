@@ -767,10 +767,22 @@ class AutoLinker:
     mlflow.set_experiment(self.experiment_name)
 
     # Count rows in data - doing this here so we only do it once
-    self.data_rowcount = data.count()
+    if self.linker_mode == "dedupe_only":
+      self.data_rowcount = data.count()
+    else:
+      # use the larger dataframe as baseline
+      df0_size = data[0].count()
+      df1_size = data[1].count()
+      if df0_size < df1_size:
+        self.data_rowcount = data[1].count()
+      else:
+        self.data_rowcount = data[0].count()
     
     # Clean the data
-    data = self._clean_columns(data, attribute_columns, cleaning)
+    if self.linker_mode == "dedupe_only":
+      data = self._clean_columns(data, attribute_columns, cleaning)
+    else:
+      data = [self._clean_columns(x, attribute_columns, cleaning) for x in data]
     
     # define objective function
     def tune_model(space):
