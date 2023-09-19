@@ -10,6 +10,10 @@ The package can be installed with pip:
 %pip install databricks-arc
 ```
 
+## Databricks Runtime Requirements
+
+ARC requires DBR 12.2 LTS ML
+
 ## Project Description
 
 Databricks ARC (Automated Record Connector) is a solution accelerator by Databricks that performs highly scalable probabilistic data de-duplication without the requirement for any labelled data or subject matter expertise in entity resolution.
