@@ -413,9 +413,9 @@ class AutoLinker:
   ) -> None:
     # Clean the data
     if self.linker_mode == "dedupe_only":
-      self._autolink_data = self._clean_columns(self._autolink_data, self.attribute_columns, self._cleaning_mode)
+      self._autolink_data = self._clean_columns(self._autolink_data, self.attribute_columns)
     else:
-      self._autolink_data = [self._clean_columns(x, self.attribute_columns, self._cleaning_mode) for x in self._autolink_data]
+      self._autolink_data = [self._clean_columns(x, self.attribute_columns) for x in self._autolink_data]
 
   def _convert_hyperopt_to_splink(
           self
