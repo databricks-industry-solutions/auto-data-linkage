@@ -789,10 +789,10 @@ class AutoLinker:
     # define objective function
     def tune_model(space):
       linker, predictions, evals, params, run_id = self.train_and_evaluate_linker(
-        data,
+        self._autolink_data,
         space,
-        attribute_columns,
-        unique_id=unique_id,
+        self.attribute_columns,
+        unique_id=self.unique_id,
         deterministic_columns=self.deterministic_columns,
         training_columns=self.training_columns,
         threshold=threshold,
