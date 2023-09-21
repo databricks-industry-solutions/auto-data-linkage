@@ -23,6 +23,7 @@ import numpy as np
 import math
 import random
 from datetime import datetime
+import itertools
 
 
 from sklearn.metrics import (adjusted_mutual_info_score, adjusted_rand_score,
@@ -81,6 +82,8 @@ class AutoLinker:
     self.spark = spark 
     self.catalog = catalog
     self.schema = schema
+
+    self.data = None
     
     self.experiment_name = experiment_name
     self.training_columns = training_columns
@@ -358,8 +361,7 @@ class AutoLinker:
   def _clean_columns(
     self,
     data:pyspark.sql.DataFrame,
-    attribute_columns:list,
-    cleaning="all"):
+    attribute_columns:list):
     """
     Method to clean string columns (turn them to lower case and remove non-alphanumeric characters)
     in order to help with better (and quicker) string-distance calculations. If cleaning is 'all'
@@ -374,7 +376,8 @@ class AutoLinker:
     :param cleaning: string or dicitonary with keys as column names and values as list of valid cleaning method names.
 
     """
-    
+
+    cleaning = self._cleaning_mode
     # if cleaning is set to "none", don't do anything to the data
     if cleaning=="none":
       return data
@@ -397,9 +400,19 @@ class AutoLinker:
           data = data.withColumn(col, F.lower(F.col(col)))
           
     return data
-  
 
-  def _convert_hyperopt_to_splink(self) -> dict:
+  def _do_column_cleaning(
+          self
+  ) -> None:
+    # Clean the data
+    if self.linker_mode == "dedupe_only":
+      self._autolink_data = self._clean_columns(self._autolink_data, self.attribute_columns, self._cleaning_mode)
+    else:
+      self._autolink_data = [self._clean_columns(x, self.attribute_columns, self._cleaning_mode) for x in self._autolink_data]
+
+  def _convert_hyperopt_to_splink(
+          self
+  ) -> dict:
     """
     Method to convert hyperopt trials to a dictionary that can be used to
     train a linker model. Used for training the best linker model at the end of an experiment.
@@ -706,10 +719,10 @@ class AutoLinker:
   def auto_link(
     self,
     data: typing.Union[pyspark.sql.dataframe.DataFrame, list],
-    attribute_columns:list,
-    unique_id:str,
-    comparison_size_limit:int,
-    max_evals:int,
+    attribute_columns:list=None,
+    unique_id:str=None,
+    comparison_size_limit:int=100000,
+    max_evals:int=1,
     cleaning="all",
     threshold:float=0.9,
     true_label:str=None,
@@ -732,57 +745,33 @@ class AutoLinker:
     :param random_seed: Seed for Hyperopt fmin
     """
 
-    # evaluate input argument of data
-    _data_error_message = "The data argument accepts a single spark dataframe for deduplication, or a list of 2 " \
-                          "spark dataframes for linking"
-    if type(data) not in set([pyspark.sql.dataframe.DataFrame, list]):
-      raise ValueError(_data_error_message)
-    if type(data) is list:
-      data_len = len(data)
-      data_types = {type(x) for x in data}
-      if data_len != 2:
-        raise ValueError(_data_error_message)
-      if len(data_types) != 1:
-        raise ValueError(_data_error_message)
-      if data_types.pop() != pyspark.sql.dataframe.DataFrame:
-        raise ValueError(_data_error_message)
-
+    self._evaluate_data_input_arg(data)
+    self._autolink_data = data
+    self._cleaning_mode = cleaning
+    self.attribute_columns = attribute_columns
     # set autolinker mode based on input data arg
-    if type(data) == list:
+    if type(self._autolink_data) == list:
       self.linker_mode = "link_only"
     else:
       self.linker_mode = "dedupe_only"
-    # extract spark from input data
-    if type(data) == list:
-      self.spark = data[0].sparkSession if not self.spark else self.spark
-    else:
-      self.spark = data.sparkSession if not self.spark else self.spark
-    self.catalog = self.catalog if self.catalog else self.spark.catalog.currentCatalog()
-    self.schema = self.schema   if self.schema else self.spark.catalog.currentDatabase()
-    
-    self.username = self.spark.sql('select current_user() as user').collect()[0]['user']
-    self.experiment_name = self.experiment_name if self.experiment_name else f"/Users/{self.username}/Databricks Autolinker {str(datetime.now())}"
-    self.best_params = None
-    
+
+    # set spark paramaters
+    self._set_spark_parameters()
+
+    # set mlflow details
+    self._set_mlflow_parameters()
+
+    # set attribute columns if not provided
+    if not attribute_columns:
+      self.attribute_columns = self._create_attribute_columns()
+
     mlflow.set_experiment(self.experiment_name)
 
     # Count rows in data - doing this here so we only do it once
-    if self.linker_mode == "dedupe_only":
-      self.data_rowcount = data.count()
-    else:
-      # use the larger dataframe as baseline
-      df0_size = data[0].count()
-      df1_size = data[1].count()
-      if df0_size < df1_size:
-        self.data_rowcount = data[1].count()
-      else:
-        self.data_rowcount = data[0].count()
+    self._get_rowcounts()
     
     # Clean the data
-    if self.linker_mode == "dedupe_only":
-      data = self._clean_columns(data, attribute_columns, cleaning)
-    else:
-      data = [self._clean_columns(x, attribute_columns, cleaning) for x in data]
+    self._do_column_cleaning()
     
     # define objective function
     def tune_model(space):
@@ -846,7 +835,158 @@ class AutoLinker:
     print(success_text)
     
     return None
-  
+
+  def _set_spark_parameters(self):
+    # extract spark from input data
+    if type(self._autolink_data) == list:
+      self.spark = self._autolink_data[0].sparkSession if not self.spark else self.spark
+    else:
+      self.spark = self._autolink_data.sparkSession if not self.spark else self.spark
+    self.catalog = self.catalog if self.catalog else self.spark.catalog.currentCatalog()
+    self.schema = self.schema if self.schema else self.spark.catalog.currentDatabase()
+
+  def _set_mlflow_parameters(self):
+    self.username = self.spark.sql('select current_user() as user').collect()[0]['user']
+    self.experiment_name = self.experiment_name if self.experiment_name else f"/Users/{self.username}/Databricks Autolinker {str(datetime.now())}"
+    self.best_params = None
+
+  def _create_attribute_columns(
+          self
+  ):
+    """
+    Called only when an autolink process is initiated, this function will calculate which attribute columns to use and
+    do the necessary remapping work.
+    Returns
+    -------
+
+    """
+    data = self.self._autolink_data
+    if type(data) == list:
+      s1 = set(data[0].columns)
+      s2 = set(data[1].columns)
+      if s1 == s2:
+        attribute_columns = data[0].columns
+      else:
+        # sort tables so the one with fewer columns is first.
+        data = data.sort(key=lambda x: len(x.columns))
+        # do remappings
+        remappings = self.estimate_linking_columns(data)
+        data[0] = data[0].selectExpr("*", [f"{x[0]} as {x[2]}" for x in remappings])
+        data[1] = data[1].selectExpr("*", [f"{x[1]} as {x[2]}" for x in remappings])
+        # finally, set attribute columns
+        self._autolink_data = data
+        attribute_columns = [x[2] for x in remappings]
+    else:
+      attribute_columns = self._estimate_clustering_columns(data)
+    return attribute_columns
+
+  def _get_rowcounts(self):
+    if self.linker_mode == "dedupe_only":
+      self.data_rowcount = self._autolink_data.count()
+    else:
+      # use the larger dataframe as baseline
+      df0_size = self._autolink_data[0].count()
+      df1_size = self._autolink_data[1].count()
+      if df0_size < df1_size:
+        self.data_rowcount = self._autolink_data[1].count()
+      else:
+        self.data_rowcount = self._autolink_data[0].count()
+
+  def _evaluate_data_input_arg(
+          self,
+          data: typing.Union[pyspark.sql.dataframe.DataFrame, list]
+  ):
+    # evaluate input argument of data
+    _data_error_message = "The data argument accepts a single spark dataframe for deduplication, or a list of 2 " \
+                          "spark dataframes for linking"
+    if type(data) not in set([pyspark.sql.dataframe.DataFrame, list]):
+      raise ValueError(_data_error_message)
+    if type(data) is list:
+      data_len = len(data)
+      data_types = {type(x) for x in data}
+      if data_len != 2:
+        raise ValueError(_data_error_message)
+      if len(data_types) != 1:
+        raise ValueError(_data_error_message)
+      if data_types.pop() != pyspark.sql.dataframe.DataFrame:
+        raise ValueError(_data_error_message)
+
+  def estimate_linking_columns(
+          self
+          ,data: list
+  ):
+    '''
+    This function estimates the attribute columns for linking 2 datasets. It does this by joining each dataset on each
+    column to every other column, and choosing the pairing with the highest count.
+
+    Parameters
+    ----------
+    data : 2 spark dataframes which will be linked
+
+    Returns
+    - a mapping of the 2 tables to a standard schema.
+    -------
+
+    '''
+    columns = [x.columns for x in data]
+
+    # write sql to lowercase and remove all non alpha-numeric characters
+    cleaning_sql = 'lower(regexp_replace({column},  "[^0-9a-zA-Z]+", "")) as {column}'
+    sqls = [list(map(lambda x: cleaning_sql.format(column=x), y)) for y in columns]
+
+    # apply sql
+    cleaned_data = [
+      data[0].selectExpr(sqls[0]),
+      data[1].selectExpr(sqls[1])
+    ]
+
+    # cross product of column names to get all the joins.
+    # remove reversed duplicates (A,B) == (B, A)
+    column_joins = itertools.product(*columns)
+    final_joins = set()
+    for x in column_joins:
+      if (x[1], x[0]) not in final_joins:
+        final_joins.add(x)
+
+    # loop through the final joins and store the counts with the join criteria
+    results = []
+    for x in final_joins:
+      results.append([*x, cleaned_data[0].join(cleaned_data[1], on=cleaned_data[0][x[0]]==cleaned_data[1][x[1]], how="inner").count()])
+    # sort the results to get an ordered list of (cola, colb, count) ordered by cola and count descending
+    results.sort(key=lambda x: (x[0], -x[2]))
+
+    # find the column comparison with the highest count
+    comparisons = [results[0]]
+    for x in results[1:]:
+      if x[0] == comparisons[-1][0]:
+        pass
+      else:
+        comparisons.append(x)
+
+    # create mapping of old names to new names
+    updated_name_mappings = []
+    for x in comparisons:
+      updated_name_mappings.append([x[0], x[1], "".join([x[0], x[1]])])
+
+    return updated_name_mappings
+
+  def estimate_clustering_columns(
+          self
+          , data: pyspark.sql.dataframe.DataFrame
+  ):
+    '''
+    Use all values as attributes for deduping.
+    This method is in place in case we want to do something different in future.
+    Parameters
+    ----------
+    data :
+
+    Returns
+    -------
+
+    '''
+    return data.columns
+
   def get_best_splink_model(self):
     """
     Get the underlying Splink model from the MLFlow Model Registry. Useful for advanced users wishing to access Splink's
