@@ -33,6 +33,7 @@ from sklearn.metrics import (adjusted_mutual_info_score, adjusted_rand_score,
 import typing
 
 import mlflow
+from mlflow.tracking import MlflowClient
 
 
 class AutoLinker:
@@ -1226,3 +1227,16 @@ class AutoLinker:
     }
 
     return cluster_scores
+
+  def delete_all_linking_experiments(self):
+    if input("WARNING - this will delete all your ARC generated MLFlow experiments") != "YES":
+      return
+    username = self.spark.sql('select current_user() as user').collect()[0]['user']
+    pattern = f"%{username}/Databricks Autolinker%"
+
+    client = MlflowClient()
+    experiments = (
+      client.search_experiments(filter_string=f"name LIKE '{pattern}'")
+    )  # returns a list of mlflow.entities.Experiment
+    for exp in experiments:
+      client.delete_experiment(exp.experiment_id)
