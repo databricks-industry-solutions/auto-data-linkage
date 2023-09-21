@@ -1229,7 +1229,7 @@ class AutoLinker:
     return cluster_scores
 
   def delete_all_linking_experiments(self):
-    if input("WARNING - this will delete all your ARC generated MLFlow experiments") != "YES":
+    if input("WARNING - this will delete all your ARC generated MLFlow experiments, Type 'YES' to proceed" ) != "YES":
       return
     username = self.spark.sql('select current_user() as user').collect()[0]['user']
     pattern = f"%{username}/Databricks Autolinker%"
