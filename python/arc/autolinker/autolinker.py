@@ -873,7 +873,7 @@ class AutoLinker:
     -------
 
     """
-    data = self.self._autolink_data
+    data = self._autolink_data
     if type(data) == list:
       s1 = set(data[0].columns)
       s2 = set(data[1].columns)
