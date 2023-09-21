@@ -94,6 +94,13 @@ class AutoLinker:
     self.original_entropies = dict()
 
 
+    self._autolink_data = None
+    self._cleaning_mode = None
+    self.attribute_columns = None
+    self.unique_id = None
+    self.linker_mode = None
+
+
   def __str__(self):
     return f"AutoLinker instance working in {self.catalog}.{self.schema} and MLflow experiment {self.experiment_name}"
 
@@ -764,7 +771,7 @@ class AutoLinker:
     self._set_mlflow_parameters()
 
     # set attribute columns if not provided
-    if not attribute_columns:
+    if not self.attribute_columns:
       self.attribute_columns = self._create_attribute_columns()
 
     mlflow.set_experiment(self.experiment_name)
