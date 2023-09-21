@@ -813,12 +813,12 @@ class AutoLinker:
       space = self._create_hyperopt_space(self._autolink_data, self.attribute_columns, comparison_size_limit)
     else:
       # use the larger dataframe as baseline
-      df0_size = data[0].count()
-      df1_size = data[1].count()
+      df0_size = self._autolink_data[0].count()
+      df1_size = self._autolink_data[1].count()
       if df0_size < df1_size:
-        space = self._create_hyperopt_space(data[1], attribute_columns, comparison_size_limit)
+        space = self._create_hyperopt_space(self._autolink_data[1], self.attribute_columns, comparison_size_limit)
       else:
-        space = self._create_hyperopt_space(data[0], attribute_columns, comparison_size_limit)
+        space = self._create_hyperopt_space(self._autolink_data[0], self.attribute_columns, comparison_size_limit)
 
     
       # run hyperopt trials
@@ -835,7 +835,7 @@ class AutoLinker:
     best_param_for_rt = self._convert_hyperopt_to_splink()
     
     self.best_run_id = self.trials.best_trial["result"]["run_id"]
-    self.best_linker, self.best_predictions_df = self.train_linker(data, best_param_for_rt, attribute_columns, unique_id, self.training_columns)
+    self.best_linker, self.best_predictions_df = self.train_linker(self._autolink_data, best_param_for_rt, self.attribute_columns, self.unique_id, self.training_columns)
 
     
     # return succes text
