@@ -749,6 +749,8 @@ class AutoLinker:
     self._autolink_data = data
     self._cleaning_mode = cleaning
     self.attribute_columns = attribute_columns
+    self.unique_id = unique_id
+
     # set autolinker mode based on input data arg
     if type(self._autolink_data) == list:
       self.linker_mode = "link_only"
@@ -772,6 +774,10 @@ class AutoLinker:
     
     # Clean the data
     self._do_column_cleaning()
+
+    # set unique id if not provided
+    if not self.unique_id:
+      self._set_unique_id()
     
     # define objective function
     def tune_model(space):
@@ -797,7 +803,7 @@ class AutoLinker:
     # initialise trials and create hyperopt space
     self.trials = Trials()
     if self.linker_mode == "dedupe_only":
-      space = self._create_hyperopt_space(data, attribute_columns, comparison_size_limit)
+      space = self._create_hyperopt_space(self._autolink_data, self.attribute_columns, comparison_size_limit)
     else:
       # use the larger dataframe as baseline
       df0_size = data[0].count()
@@ -891,6 +897,16 @@ class AutoLinker:
         self.data_rowcount = self._autolink_data[1].count()
       else:
         self.data_rowcount = self._autolink_data[0].count()
+
+  def _set_unique_id(self):
+    if type(self._autolink_data) == list:
+      self._autolink_data[0] = self._autolink_data[0].withColumn("unique_id", F.monotonically_increasing_id())
+      self._autolink_data[1] = self._autolink_data[1].withColumn("unique_id", F.monotonically_increasing_id())
+    else:
+      self._autolink_data = self._autolink_data.withColumn("unique_id", F.monotonically_increasing_id())
+
+    self.unique_id = "unique_id"
+
 
   def _evaluate_data_input_arg(
           self,
