@@ -902,9 +902,9 @@ class AutoLinker:
       df0_size = self._autolink_data[0].count()
       df1_size = self._autolink_data[1].count()
       if df0_size < df1_size:
-        self.data_rowcount = self._autolink_data[1].count()
+        self.data_rowcount = df1_size
       else:
-        self.data_rowcount = self._autolink_data[0].count()
+        self.data_rowcount = df0_size
 
   def _set_unique_id(self):
     if type(self._autolink_data) == list:
