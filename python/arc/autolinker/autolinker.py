@@ -321,7 +321,6 @@ class AutoLinker:
       max_columns_per_and_rule=max_columns_per_and_rule,
       max_rules_per_or_rule=max_rules_per_or_rule
     )
-
     # Create comparison dictionary using Hyperopt sampling
     space = dict()
     comparison_space = dict()
@@ -348,7 +347,6 @@ class AutoLinker:
       "blocking_rules": hp.choice("blocking_rules", self.blocking_rules),
       "comparisons": comparison_space
     })
-
     return space
   
   
@@ -411,15 +409,19 @@ class AutoLinker:
 
   def _do_column_cleaning(
           self
-  ) -> None:
+          ,autolink_data
+          ,linker_mode
+          ,attribute_columns
+  ) -> typing.Union[pyspark.sql.dataframe.DataFrame, list]:
     # Clean the data
-    if self.linker_mode == "dedupe_only":
-      self._autolink_data = self._clean_columns(self._autolink_data, self.attribute_columns)
+    if linker_mode == "dedupe_only":
+      output_data = self._clean_columns(autolink_data, attribute_columns)
     else:
-      self._autolink_data = [
-        self._clean_columns(self._autolink_data[0], self.attribute_columns),
-        self._clean_columns(self._autolink_data[1], self.attribute_columns)
+      output_data = [
+        self._clean_columns(autolink_data[0], attribute_columns),
+        self._clean_columns(autolink_data[1], attribute_columns)
       ]
+    return output_data
 
   def _convert_hyperopt_to_splink(
           self
@@ -634,7 +636,7 @@ class AutoLinker:
     
     # Cluster records that are matched above threshold
     # get adjusted base
-    if self.linker_mode == "dedupe_only":
+    if type(data) != list:
       k = max([data.groupBy(cn).count().count() for cn in attribute_columns])
     else:
       # use the larger dataframe as baseline
@@ -768,27 +770,40 @@ class AutoLinker:
     else:
       self.linker_mode = "dedupe_only"
 
-    # set spark paramaters
-    self._set_spark_parameters()
+    # set spark paramaters if not provided
+    if not self.spark:
+      self.spark = self._get_spark(self._autolink_data)
+    if not self.catalog:
+      self.catalog = self._get_catalog(self.spark)
+    if not self.schema:
+      self.schema = self._get_schema(self.spark)
 
     # set mlflow details
-    self._set_mlflow_parameters()
+    if not self.experiment_name:
+      self.experiment_name = self._set_mlflow_experiment_name(self.spark)
+    mlflow.set_experiment(self.experiment_name)
 
     # set attribute columns if not provided
     if not self.attribute_columns:
-      self.attribute_columns = self._create_attribute_columns()
+      self.attribute_columns, self._autolink_data = self._create_attribute_columns(self._autolink_data)
 
-    mlflow.set_experiment(self.experiment_name)
 
     # Count rows in data - doing this here so we only do it once
-    self._get_rowcounts()
+    self.data_rowcount = self._get_rowcounts(self._autolink_data)
     
     # Clean the data
-    self._do_column_cleaning()
+    self._autolink_data = self._do_column_cleaning(
+      self._autolink_data
+      ,self.linker_mode
+      ,self.attribute_columns
+    )
 
     # set unique id if not provided
     if not self.unique_id:
-      self._set_unique_id()
+      self._autolink_data = self._set_unique_id(self._autolink_data)
+      self.unique_id = "unique_id"
+
+
     
     # define objective function
     def tune_model(space):
@@ -853,22 +868,30 @@ class AutoLinker:
     
     return None
 
-  def _set_spark_parameters(self):
+  def _get_spark(
+          self
+          ,autolink_data: typing.Union[pyspark.sql.dataframe.DataFrame, list]
+  ):
     # extract spark from input data
-    if type(self._autolink_data) == list:
-      self.spark = self._autolink_data[0].sparkSession if not self.spark else self.spark
+    if type(autolink_data) == list:
+      spark = autolink_data[0].sparkSession
     else:
-      self.spark = self._autolink_data.sparkSession if not self.spark else self.spark
-    self.catalog = self.catalog if self.catalog else self.spark.catalog.currentCatalog()
-    self.schema = self.schema if self.schema else self.spark.catalog.currentDatabase()
+      spark = autolink_data.sparkSession
+    return spark
+  def _get_catalog(self, spark):
+    return spark.catalog.currentCatalog()
 
-  def _set_mlflow_parameters(self):
-    self.username = self.spark.sql('select current_user() as user').collect()[0]['user']
-    self.experiment_name = self.experiment_name if self.experiment_name else f"/Users/{self.username}/Databricks Autolinker {str(datetime.now())}"
-    self.best_params = None
+  def _get_schema(self, spark):
+    return spark.catalog.currentDatabase()
+
+  def _set_mlflow_experiment_name(self, spark):
+    username = spark.sql('select current_user() as user').collect()[0]['user']
+    experiment_name =  f"/Users/{username}/Databricks Autolinker {str(datetime.now())}"
+    return experiment_name
 
   def _create_attribute_columns(
           self
+          ,autolink_data
   ):
     """
     Called only when an autolink process is initiated, this function will calculate which attribute columns to use and
@@ -877,7 +900,7 @@ class AutoLinker:
     -------
 
     """
-    data = self._autolink_data
+    data = autolink_data
     if type(data) == list:
       s1 = set(data[0].columns)
       s2 = set(data[1].columns)
@@ -891,32 +914,32 @@ class AutoLinker:
         data[0] = data[0].selectExpr("*", [f"{x[0]} as {x[2]}" for x in remappings])
         data[1] = data[1].selectExpr("*", [f"{x[1]} as {x[2]}" for x in remappings])
         # finally, set attribute columns
-        self._autolink_data = data
         attribute_columns = [x[2] for x in remappings]
     else:
       attribute_columns = self._estimate_clustering_columns(data)
-    return attribute_columns
+    return attribute_columns, data
 
-  def _get_rowcounts(self):
-    if self.linker_mode == "dedupe_only":
-      self.data_rowcount = self._autolink_data.count()
+  def _get_rowcounts(self, linker_mode, autolink_data):
+    if linker_mode == "dedupe_only":
+      data_rowcount = autolink_data.count()
     else:
       # use the larger dataframe as baseline
-      df0_size = self._autolink_data[0].count()
-      df1_size = self._autolink_data[1].count()
+      df0_size = autolink_data[0].count()
+      df1_size = autolink_data[1].count()
       if df0_size < df1_size:
-        self.data_rowcount = df1_size
+        data_rowcount = df1_size
       else:
-        self.data_rowcount = df0_size
+        data_rowcount = df0_size
+    return data_rowcount
 
-  def _set_unique_id(self):
-    if type(self._autolink_data) == list:
-      self._autolink_data[0] = self._autolink_data[0].withColumn("unique_id", F.monotonically_increasing_id())
-      self._autolink_data[1] = self._autolink_data[1].withColumn("unique_id", F.monotonically_increasing_id())
+  def _set_unique_id(self, autolink_data):
+    if type(autolink_data) == list:
+      autolink_data[0] = autolink_data[0].withColumn("unique_id", F.monotonically_increasing_id())
+      autolink_data[1] = autolink_data[1].withColumn("unique_id", F.monotonically_increasing_id())
     else:
-      self._autolink_data = self._autolink_data.withColumn("unique_id", F.monotonically_increasing_id())
+      autolink_data = autolink_data.withColumn("unique_id", F.monotonically_increasing_id())
 
-    self.unique_id = "unique_id"
+    return autolink_data
 
 
   def _evaluate_data_input_arg(
