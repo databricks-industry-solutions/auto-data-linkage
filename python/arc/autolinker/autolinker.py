@@ -825,7 +825,7 @@ class AutoLinker:
         result.update({k:v})
 
       return result
-    print("making space")
+
     # initialise trials and create hyperopt space
     self.trials = Trials()
     if self.linker_mode == "dedupe_only":
@@ -839,7 +839,6 @@ class AutoLinker:
       else:
         space = self._create_hyperopt_space(self._autolink_data[0], self.attribute_columns, comparison_size_limit)
 
-      print("made space, starting trials")
       # run hyperopt trials
     self.best = fmin(
         fn=tune_model,
