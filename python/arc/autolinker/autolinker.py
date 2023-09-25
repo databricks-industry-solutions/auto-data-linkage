@@ -977,7 +977,7 @@ class AutoLinker:
     -------
 
     '''
-    columns = [filter(lambda x: x != self.unique_id, x.columns) for x in data]
+    columns = [list(filter(lambda x: x != self.unique_id, x.columns)) for x in data]
 
     # write sql to lowercase and remove all non alpha-numeric characters
     cleaning_sql = 'lower(regexp_replace({column},  "[^0-9a-zA-Z]+", "")) as {column}'
