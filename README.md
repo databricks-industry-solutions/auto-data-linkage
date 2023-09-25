@@ -1,4 +1,4 @@
-# Darabricks ARC
+# Databricks ARC
 
 Welcome to the Databricks ARC Github page.
 
@@ -16,7 +16,19 @@ ARC requires DBR 12.2 LTS ML
 
 ## Project Description
 
-Databricks ARC (Automated Record Connector) is a solution accelerator by Databricks that performs highly scalable probabilistic data de-duplication without the requirement for any labelled data or subject matter expertise in entity resolution.
+Databricks ARC (Automated Record Connector) is a solution accelerator by Databricks that performs highly scalable probabilistic data de-duplication 
+and linking without the requirement for any labelled data or subject matter expertise in entity resolution.
+
+De-duplication and linking are 2 sides of the same coin; de-duplication will find records *within* a dataset which represent the same entity, 
+whilst linking will find records *across* 2 datasets which represent the same entity. De-deduplication is key requirement for implementing a Master Data Management strategy;
+for example, to provide a Single Customer View by consolidating different data silos. Linking is also a key part, by bringing together different fragments of information
+to build a holistic representation of an entity. 
+
+To illustrate with an example, this table requires de-duplicating
+
+|**First Name**|**Surname**|**Address Line 1**|**Address Line 2**|**Address Line 3**|**Post Code**|**DoB**|
+|--------------|-----------|------------------|------------------|------------------|-------------|-------|
+|Jo|Blogs|123 Fake Street|Real Town|Real County|
 
 ARC's linking engine is the UK Ministry of Justice's open-sourced entity resolution package, [Splink](https://github.com/moj-analytical-services/splink). It builds on the technology of Splink by removing the need to manually provide parameters to calibrate an unsupervised de-duplication task, which require both a deep understanding of entity resolution and good knowledge of the dataset itself. The way in which ARC achieves this is detailed in the table below:
 
@@ -89,10 +101,6 @@ Run unsupervised de-duplication:
 ```python
 autolinker.auto_link(
   data=data,                                                         # Spark DataFrame of data to deduplicate
-  attribute_columns=["givenname", "surname", "postcode", "suburb"],  # List of column names containing attribute to compare
-  unique_id="uid",                                                   # Name of the unique identifier column
-  comparison_size_limit=100000,                                      # Maximum number of pairs to compare
-  max_evals=20                                                       # Number of trials to run during optimisation process
 )
 ```
 
@@ -107,4 +115,4 @@ Use Splink's built-in visualisers and dashboards:
 ```python
 autolinker.cluster_viewer()
 ```
-
+For a more in-depth walkthrough please see the included notebooks

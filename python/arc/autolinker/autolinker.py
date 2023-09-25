@@ -915,7 +915,7 @@ class AutoLinker:
         # finally, set attribute columns
         attribute_columns = [x[2] for x in remappings]
     else:
-      attribute_columns = self._estimate_clustering_columns(data)
+      attribute_columns = self.estimate_clustering_columns(data)
     return attribute_columns, data
 
   def _get_rowcounts(self, linker_mode, autolink_data):
