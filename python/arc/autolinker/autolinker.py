@@ -789,7 +789,7 @@ class AutoLinker:
 
 
     # Count rows in data - doing this here so we only do it once
-    self.data_rowcount = self._get_rowcounts(self._autolink_data)
+    self.data_rowcount = self._get_rowcounts(self.linker_mode, self._autolink_data)
     
     # Clean the data
     self._autolink_data = self._do_column_cleaning(
