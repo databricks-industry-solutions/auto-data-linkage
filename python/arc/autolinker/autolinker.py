@@ -909,7 +909,7 @@ class AutoLinker:
         attribute_columns = data[0].columns
       else:
         # sort tables so the one with fewer columns is first.
-        data.sort(key=lambda x: len(x.columns))
+        data.sort(key=lambda x: -len(x.columns))
         # do remappings
         remappings = self.estimate_linking_columns(data)
         data[0] = data[0].selectExpr("*", [f"{x[0]} as {x[2]}" for x in remappings])
