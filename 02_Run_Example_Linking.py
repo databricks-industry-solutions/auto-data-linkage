@@ -67,23 +67,18 @@ import arc
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC # Enable ARC
-
-# COMMAND ----------
-
-arc.enable_arc()
-
-# COMMAND ----------
-
-# MAGIC %md
 # MAGIC # Read test data
+# MAGIC
+# MAGIC ARC is capable of linking datasets with different schemas - it will automatically choose which columns for linking if schemas are different.
 
 # COMMAND ----------
 
 import os
 data = spark.read.csv(f"file:{os.getcwd()}/data/arc_febrl1.csv", header=True) #we need the file: prefix for spark to correctly read the data file
-
-data.display()
+data_1 = data.filter("uid <500")
+data_2 = data.filter("uid >= 500").drop("date_of_birth")
+link_data = [data_1, data_2]
+data_1.display()
 
 # COMMAND ----------
 
@@ -94,14 +89,9 @@ data.display()
 
 autolinker = AutoLinker()
 
-attribute_columns = ["given_name", "surname", "street_number", "address_1", "address_2", "suburb", "postcode", "state", "date_of_birth"]
-
 autolinker.auto_link(
   data=data,                                                         # Spark DataFrame of data to deduplicate
-  attribute_columns=attribute_columns,                               # List of column names containing attribute to compare
-  unique_id="uid",                                                   # Name of the unique identifier column
-  comparison_size_limit=100000,                                      # Maximum number of pairs to compare
-  max_evals=10                                                       # Number of trials to run during optimisation process
+  unique_id = "uid"
 )
 
 # COMMAND ----------
