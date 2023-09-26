@@ -777,6 +777,8 @@ class AutoLinker:
       self.catalog = self._get_catalog(self.spark)
     if not self.schema:
       self.schema = self._get_schema(self.spark)
+    # turn off AQE for duration of linking
+    self.spark.conf.set("spark.databricks.optimizer.adaptive.enabled", 'False')
 
     # set mlflow details
     if not self.experiment_name:
@@ -864,7 +866,7 @@ class AutoLinker:
     """
 
     print(success_text)
-    
+    self.spark.conf.set("spark.databricks.optimizer.adaptive.enabled", 'True')
     return None
 
   def _get_spark(
