@@ -777,8 +777,6 @@ class AutoLinker:
       self.catalog = self._get_catalog(self.spark)
     if not self.schema:
       self.schema = self._get_schema(self.spark)
-    # turn off AQE for duration of linking
-    self.spark.conf.set("spark.databricks.optimizer.adaptive.enabled", 'False')
 
     # set mlflow details
     if not self.experiment_name:
@@ -830,6 +828,9 @@ class AutoLinker:
 
     # initialise trials and create hyperopt space
     self.trials = Trials()
+
+    # turn off AQE for the blocking rule estimation process
+    self.spark.conf.set("spark.databricks.optimizer.adaptive.enabled", 'False')
     if self.linker_mode == "dedupe_only":
       space = self._create_hyperopt_space(self._autolink_data, self.attribute_columns, comparison_size_limit)
     else:
@@ -841,6 +842,8 @@ class AutoLinker:
       else:
         space = self._create_hyperopt_space(self._autolink_data[0], self.attribute_columns, comparison_size_limit)
 
+    # turn AQE back on once we're out of scala
+    self.spark.conf.set("spark.databricks.optimizer.adaptive.enabled", 'True')
       # run hyperopt trials
     self.best = fmin(
         fn=tune_model,
@@ -866,7 +869,6 @@ class AutoLinker:
     """
 
     print(success_text)
-    self.spark.conf.set("spark.databricks.optimizer.adaptive.enabled", 'True')
     return None
 
   def _get_spark(
