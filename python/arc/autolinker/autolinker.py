@@ -912,8 +912,8 @@ class AutoLinker:
         data.sort(key=lambda x: -len(x.columns))
         # do remappings
         remappings = self.estimate_linking_columns(data)
-        data[0] = data[0].selectExpr("*", [f"{x[0]} as {x[2]}" for x in remappings])
-        data[1] = data[1].selectExpr("*", [f"{x[1]} as {x[2]}" for x in remappings])
+        data[0] = data[0].selectExpr("*", *[f"{x[0]} as {x[2]}" for x in remappings])
+        data[1] = data[1].selectExpr("*", *[f"{x[1]} as {x[2]}" for x in remappings])
         # finally, set attribute columns
         attribute_columns = [x[2] for x in remappings]
     else:
