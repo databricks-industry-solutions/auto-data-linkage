@@ -96,7 +96,6 @@ class AutoLinker:
 
 
     self._autolink_data = None
-    self._cleaning_mode = None
     self.attribute_columns = None
     self.unique_id = None
     self.linker_mode = None
@@ -187,7 +186,7 @@ class AutoLinker:
     """
 
     # Calculate count of rows in each cluster and rejoin
-    cluster_counts = clusters.groupBy("cluster_id").count().withColumnRenamed("count", "_cluster_count")
+    cluster_counts = clusters.groupBy(-"cluster_id").count().withColumnRenamed("count", "_cluster_count")
     data = clusters.join(cluster_counts, on=["cluster_id"], how="left")
     
     # Number of non-singleton clusters (for entropy base)
@@ -735,7 +734,7 @@ class AutoLinker:
     attribute_columns:list=None,
     unique_id:str=None,
     comparison_size_limit:int=100000,
-    max_evals:int=1,
+    max_evals:int=5,
     cleaning="all",
     threshold:float=0.9,
     true_label:str=None,
@@ -753,7 +752,7 @@ class AutoLinker:
     :param comparison_size_limit: int denoting maximum size of pairs allowed after blocking
     :param max_evals: int denoting max number of hyperopt trials to run
     :param cleaning: string ("all" or "none") or dictionary with keys as column names and values as list of strings for methods (accepted are "lower" and "alphanumeric_only")
-    :param threshold: float indicating the probability threshold above which a pair is considered a match
+    :param threshold: float indicating the probability threshold above which a pair is considered a match≠
     :param true_label: The name of the column with true record ids, if exists (default None) - if not None, auto_link will attempt to calculate empirical scores
     :param random_seed: Seed for Hyperopt fmin
     """
