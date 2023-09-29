@@ -90,7 +90,7 @@ data_1.display()
 autolinker = AutoLinker()
 
 autolinker.auto_link(
-  data=data,                                                         # Spark DataFrame of data to deduplicate
+  data=link_data,                                                         # Spark DataFrame of data to deduplicate
   unique_id = "uid"
 )
 
