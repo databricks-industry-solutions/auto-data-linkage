@@ -273,8 +273,9 @@ class AutoLinker:
 
     if sample_for_blocking_rules:
       count = data.count()
-      fraction = 10000.0/count
-      data = data.sample(fraction)
+      if count > 10000:
+        fraction = 10000.0/count
+        data = data.sample(fraction)
 
     # replace null values with dummy
     data = data.fillna("null_")
