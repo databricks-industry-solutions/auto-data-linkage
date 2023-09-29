@@ -56,10 +56,6 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install "databricks-arc @ git+https://github.com/databricks-industry-solutions/auto-data-linkage/@enable_linking#&subdirectory=python" splink
-
-# COMMAND ----------
-
 # MAGIC %md
 # MAGIC # Load ARC
 
