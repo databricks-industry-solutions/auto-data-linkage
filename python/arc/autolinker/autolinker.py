@@ -253,6 +253,7 @@ class AutoLinker:
     data:pyspark.sql.DataFrame,
     attribute_columns:list,
     comparison_size_limit:int,
+    sample_for_blocking_rules,
     max_columns_per_and_rule:int=2,
     max_rules_per_or_rule:int=3,
   ) -> list:
@@ -269,6 +270,11 @@ class AutoLinker:
     :param max_rules_per_or_rule: the maximum number of rules comparisons in a composite rule to try
 
     """
+
+    if sample_for_blocking_rules:
+      count = data.count()
+      fraction = 10000.0/count
+      data = data.sample(fraction)
 
     # replace null values with dummy
     data = data.fillna("null_")
@@ -294,6 +300,7 @@ class AutoLinker:
     data:pyspark.sql.DataFrame,
     attribute_columns:list,
     comparison_size_limit:int,
+    sample_for_blocking_rules,
     max_columns_per_and_rule:int=2,
     max_rules_per_or_rule:int=3
   ) -> dict:
@@ -317,6 +324,7 @@ class AutoLinker:
       data=data,
       attribute_columns=attribute_columns,
       comparison_size_limit=comparison_size_limit,
+      sample_for_blocking_rules=sample_for_blocking_rules,
       max_columns_per_and_rule=max_columns_per_and_rule,
       max_rules_per_or_rule=max_rules_per_or_rule
     )
@@ -739,7 +747,9 @@ class AutoLinker:
     threshold:float=0.9,
     true_label:str=None,
     random_seed:int=42,
-    metric:str="information_gain_power_ratio"
+    metric:str="information_gain_power_ratio",
+    sample_for_blocking_rules=True
+
   ) -> None:
     """
     Method to run a series of hyperopt trials.
@@ -755,6 +765,7 @@ class AutoLinker:
     :param threshold: float indicating the probability threshold above which a pair is considered a match≠
     :param true_label: The name of the column with true record ids, if exists (default None) - if not None, auto_link will attempt to calculate empirical scores
     :param random_seed: Seed for Hyperopt fmin
+    :param sample_for_blocking_rules: boolean, default True. down sample the data to 10,000 records for blocking rule generation.
     """
 
     self._evaluate_data_input_arg(data)
@@ -831,15 +842,15 @@ class AutoLinker:
     # turn off AQE for the blocking rule estimation process
     self.spark.conf.set("spark.databricks.optimizer.adaptive.enabled", 'False')
     if self.linker_mode == "dedupe_only":
-      space = self._create_hyperopt_space(self._autolink_data, self.attribute_columns, comparison_size_limit)
+      space = self._create_hyperopt_space(self._autolink_data, self.attribute_columns, comparison_size_limit, sample_for_blocking_rules)
     else:
       # use the larger dataframe as baseline
       df0_size = self._autolink_data[0].count()
       df1_size = self._autolink_data[1].count()
       if df0_size < df1_size:
-        space = self._create_hyperopt_space(self._autolink_data[1], self.attribute_columns, comparison_size_limit)
+        space = self._create_hyperopt_space(self._autolink_data[1], self.attribute_columns, comparison_size_limit, sample_for_blocking_rules)
       else:
-        space = self._create_hyperopt_space(self._autolink_data[0], self.attribute_columns, comparison_size_limit)
+        space = self._create_hyperopt_space(self._autolink_data[0], self.attribute_columns, comparison_size_limit, sample_for_blocking_rules)
 
     # turn AQE back on once we're out of scala
     self.spark.conf.set("spark.databricks.optimizer.adaptive.enabled", 'True')
