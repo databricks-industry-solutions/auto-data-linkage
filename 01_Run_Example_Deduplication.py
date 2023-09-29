@@ -67,15 +67,6 @@ import arc
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC # Enable ARC
-
-# COMMAND ----------
-
-arc.enable_arc()
-
-# COMMAND ----------
-
-# MAGIC %md
 # MAGIC # Read test data
 
 # COMMAND ----------
@@ -88,20 +79,14 @@ data.display()
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC # Perform Auto-linking
+# MAGIC # Perform Auto-deduplication
 
 # COMMAND ----------
 
 autolinker = AutoLinker()
 
-attribute_columns = ["given_name", "surname", "street_number", "address_1", "address_2", "suburb", "postcode", "state", "date_of_birth"]
-
 autolinker.auto_link(
   data=data,                                                         # Spark DataFrame of data to deduplicate
-  attribute_columns=attribute_columns,                               # List of column names containing attribute to compare
-  unique_id="uid",                                                   # Name of the unique identifier column
-  comparison_size_limit=100000,                                      # Maximum number of pairs to compare
-  max_evals=10                                                       # Number of trials to run during optimisation process
 )
 
 # COMMAND ----------

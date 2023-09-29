@@ -23,6 +23,7 @@ import numpy as np
 import math
 import random
 from datetime import datetime
+import itertools
 
 
 from sklearn.metrics import (adjusted_mutual_info_score, adjusted_rand_score,
@@ -32,6 +33,7 @@ from sklearn.metrics import (adjusted_mutual_info_score, adjusted_rand_score,
 import typing
 
 import mlflow
+from mlflow.tracking import MlflowClient
 
 
 class AutoLinker:
@@ -81,6 +83,8 @@ class AutoLinker:
     self.spark = spark 
     self.catalog = catalog
     self.schema = schema
+
+    self.data = None
     
     self.experiment_name = experiment_name
     self.training_columns = training_columns
@@ -89,6 +93,12 @@ class AutoLinker:
     self.clusters=None
     self.cluster_threshold=None
     self.original_entropies = dict()
+
+
+    self._autolink_data = None
+    self.attribute_columns = None
+    self.unique_id = None
+    self.linker_mode = None
 
 
   def __str__(self):
@@ -176,7 +186,7 @@ class AutoLinker:
     """
 
     # Calculate count of rows in each cluster and rejoin
-    cluster_counts = clusters.groupBy("cluster_id").count().withColumnRenamed("count", "_cluster_count")
+    cluster_counts = clusters.groupBy(-"cluster_id").count().withColumnRenamed("count", "_cluster_count")
     data = clusters.join(cluster_counts, on=["cluster_id"], how="left")
     
     # Number of non-singleton clusters (for entropy base)
@@ -243,6 +253,7 @@ class AutoLinker:
     data:pyspark.sql.DataFrame,
     attribute_columns:list,
     comparison_size_limit:int,
+    sample_for_blocking_rules,
     max_columns_per_and_rule:int=2,
     max_rules_per_or_rule:int=3,
   ) -> list:
@@ -259,6 +270,12 @@ class AutoLinker:
     :param max_rules_per_or_rule: the maximum number of rules comparisons in a composite rule to try
 
     """
+
+    if sample_for_blocking_rules:
+      count = data.count()
+      if count > 10000:
+        fraction = 10000.0/count
+        data = data.sample(fraction)
 
     # replace null values with dummy
     data = data.fillna("null_")
@@ -284,6 +301,7 @@ class AutoLinker:
     data:pyspark.sql.DataFrame,
     attribute_columns:list,
     comparison_size_limit:int,
+    sample_for_blocking_rules,
     max_columns_per_and_rule:int=2,
     max_rules_per_or_rule:int=3
   ) -> dict:
@@ -307,10 +325,10 @@ class AutoLinker:
       data=data,
       attribute_columns=attribute_columns,
       comparison_size_limit=comparison_size_limit,
+      sample_for_blocking_rules=sample_for_blocking_rules,
       max_columns_per_and_rule=max_columns_per_and_rule,
       max_rules_per_or_rule=max_rules_per_or_rule
     )
-
     # Create comparison dictionary using Hyperopt sampling
     space = dict()
     comparison_space = dict()
@@ -337,7 +355,6 @@ class AutoLinker:
       "blocking_rules": hp.choice("blocking_rules", self.blocking_rules),
       "comparisons": comparison_space
     })
-
     return space
   
   
@@ -358,8 +375,7 @@ class AutoLinker:
   def _clean_columns(
     self,
     data:pyspark.sql.DataFrame,
-    attribute_columns:list,
-    cleaning="all"):
+    attribute_columns:list):
     """
     Method to clean string columns (turn them to lower case and remove non-alphanumeric characters)
     in order to help with better (and quicker) string-distance calculations. If cleaning is 'all'
@@ -374,7 +390,8 @@ class AutoLinker:
     :param cleaning: string or dicitonary with keys as column names and values as list of valid cleaning method names.
 
     """
-    
+
+    cleaning = self._cleaning_mode
     # if cleaning is set to "none", don't do anything to the data
     if cleaning=="none":
       return data
@@ -397,9 +414,26 @@ class AutoLinker:
           data = data.withColumn(col, F.lower(F.col(col)))
           
     return data
-  
 
-  def _convert_hyperopt_to_splink(self) -> dict:
+  def _do_column_cleaning(
+          self
+          ,autolink_data
+          ,linker_mode
+          ,attribute_columns
+  ) -> typing.Union[pyspark.sql.dataframe.DataFrame, list]:
+    # Clean the data
+    if linker_mode == "dedupe_only":
+      output_data = self._clean_columns(autolink_data, attribute_columns)
+    else:
+      output_data = [
+        self._clean_columns(autolink_data[0], attribute_columns),
+        self._clean_columns(autolink_data[1], attribute_columns)
+      ]
+    return output_data
+
+  def _convert_hyperopt_to_splink(
+          self
+  ) -> dict:
     """
     Method to convert hyperopt trials to a dictionary that can be used to
     train a linker model. Used for training the best linker model at the end of an experiment.
@@ -508,7 +542,7 @@ class AutoLinker:
 
   def train_linker(
     self,
-    data:pyspark.sql.DataFrame,
+    data: typing.Union[pyspark.sql.dataframe.DataFrame, list],
     space:dict,
     attribute_columns:list,
     unique_id:str,
@@ -556,7 +590,7 @@ class AutoLinker:
     settings = {
       "retain_intermediate_calculation_columns": True,
       "retain_matching_columns": True,
-      "link_type": "dedupe_only",
+      "link_type": self.linker_mode,
       "unique_id_column_name": unique_id,
       "comparisons": comparisons,
       "em_convergence": 0.01,
@@ -564,7 +598,10 @@ class AutoLinker:
     }
 
     # Train linker model
-    linker = SparkLinker(data, spark=self.spark, database=self.schema, catalog=self.catalog)
+    if self.linker_mode == "dedupe_only":
+      linker = SparkLinker(data, spark=self.spark, database=self.schema, catalog=self.catalog)
+    else:
+      linker = SparkLinker(data, spark=self.spark, database=self.schema, catalog=self.catalog, input_table_aliases=["df_left", "df_right"])
     
     linker.load_settings(settings)
     linker._settings_obj._probability_two_random_records_match = 1/self.data_rowcount
@@ -582,7 +619,7 @@ class AutoLinker:
   
   def evaluate_linker(
     self,
-    data:pyspark.sql.DataFrame,
+    data: typing.Union[pyspark.sql.dataframe.DataFrame, list],
     predictions:splink.splink_dataframe.SplinkDataFrame,
     threshold:float,
     attribute_columns:list,
@@ -607,7 +644,17 @@ class AutoLinker:
     
     # Cluster records that are matched above threshold
     # get adjusted base
-    k = max([data.groupBy(cn).count().count() for cn in attribute_columns])
+    if type(data) != list:
+      k = max([data.groupBy(cn).count().count() for cn in attribute_columns])
+    else:
+      # use the larger dataframe as baseline
+      df0_size = data[0].count()
+      df1_size = data[1].count()
+      if df0_size < df1_size:
+        k = max([data[1].groupBy(cn).count().count() for cn in attribute_columns])
+      else:
+        k = max([data[0].groupBy(cn).count().count() for cn in attribute_columns])
+
     clusters = linker.cluster_pairwise_predictions_at_threshold(predictions, threshold_match_probability=threshold)
     df_clusters = clusters.as_spark_dataframe()
     
@@ -634,7 +681,7 @@ class AutoLinker:
   
   def train_and_evaluate_linker(
     self,
-    data:pyspark.sql.DataFrame,
+    data: typing.Union[pyspark.sql.dataframe.DataFrame, list],
     space:dict,
     attribute_columns:list,
     unique_id:str,
@@ -690,62 +737,92 @@ class AutoLinker:
     run_id = run.info.run_id
     return linker, predictions, evals, params, run_id
 
-  
-  
   def auto_link(
     self,
-    data:pyspark.sql.DataFrame,
-    attribute_columns:list,
-    unique_id:str,
-    comparison_size_limit:int,
-    max_evals:int,
+    data: typing.Union[pyspark.sql.dataframe.DataFrame, list],
+    attribute_columns:list=None,
+    unique_id:str=None,
+    comparison_size_limit:int=100000,
+    max_evals:int=5,
     cleaning="all",
     threshold:float=0.9,
     true_label:str=None,
     random_seed:int=42,
-    metric:str="information_gain_power_ratio"
+    metric:str="information_gain_power_ratio",
+    sample_for_blocking_rules=True
+
   ) -> None:
     """
     Method to run a series of hyperopt trials.
     
 
-    :param data: Spark DataFrame containing the data to be de-duplicated
+    :param data: Either a Spark DataFrame containing the data to be de-duplicated, or a list of 2 Spark Dataframes to be linked.
     :param space: dictionary generated by hyperopt sampling
     :param attribute_columns: list of strings containing all attribute columns
     :param unique_id: string with the name of the unique ID column
     :param comparison_size_limit: int denoting maximum size of pairs allowed after blocking
     :param max_evals: int denoting max number of hyperopt trials to run
     :param cleaning: string ("all" or "none") or dictionary with keys as column names and values as list of strings for methods (accepted are "lower" and "alphanumeric_only")
-    :param threshold: float indicating the probability threshold above which a pair is considered a match
+    :param threshold: float indicating the probability threshold above which a pair is considered a match≠
     :param true_label: The name of the column with true record ids, if exists (default None) - if not None, auto_link will attempt to calculate empirical scores
     :param random_seed: Seed for Hyperopt fmin
+    :param sample_for_blocking_rules: boolean, default True. down sample the data to 10,000 records for blocking rule generation.
     """
-    
-    # extract spark from input data
 
-    self.spark = data.sparkSession if not self.spark else self.spark
-    self.catalog = self.catalog if self.catalog else self.spark.catalog.currentCatalog()
-    self.schema = self.schema   if self.schema else self.spark.catalog.currentDatabase()
-    
-    self.username = self.spark.sql('select current_user() as user').collect()[0]['user']
-    self.experiment_name = self.experiment_name if self.experiment_name else f"/Users/{self.username}/Databricks Autolinker {str(datetime.now())}"
-    self.best_params = None
-    
+    self._evaluate_data_input_arg(data)
+    self._autolink_data = data
+    self._cleaning_mode = cleaning
+    self.attribute_columns = attribute_columns
+    self.unique_id = unique_id
+
+    # set autolinker mode based on input data arg
+    if type(self._autolink_data) == list:
+      self.linker_mode = "link_only"
+    else:
+      self.linker_mode = "dedupe_only"
+
+    # set spark paramaters if not provided
+    if not self.spark:
+      self.spark = self._get_spark(self._autolink_data)
+    if not self.catalog:
+      self.catalog = self._get_catalog(self.spark)
+    if not self.schema:
+      self.schema = self._get_schema(self.spark)
+
+    # set mlflow details
+    if not self.experiment_name:
+      self.experiment_name = self._set_mlflow_experiment_name(self.spark)
     mlflow.set_experiment(self.experiment_name)
 
+    # set attribute columns if not provided
+    if not self.attribute_columns:
+      self.attribute_columns, self._autolink_data = self._create_attribute_columns(self._autolink_data)
+
+
     # Count rows in data - doing this here so we only do it once
-    self.data_rowcount = data.count()
+    self.data_rowcount = self._get_rowcounts(self.linker_mode, self._autolink_data)
     
     # Clean the data
-    data = self._clean_columns(data, attribute_columns, cleaning)
+    self._autolink_data = self._do_column_cleaning(
+      self._autolink_data
+      ,self.linker_mode
+      ,self.attribute_columns
+    )
+
+    # set unique id if not provided
+    if not self.unique_id:
+      self._autolink_data = self._set_unique_id(self._autolink_data)
+      self.unique_id = "unique_id"
+
+
     
     # define objective function
     def tune_model(space):
       linker, predictions, evals, params, run_id = self.train_and_evaluate_linker(
-        data,
+        self._autolink_data,
         space,
-        attribute_columns,
-        unique_id=unique_id,
+        self.attribute_columns,
+        unique_id=self.unique_id,
         deterministic_columns=self.deterministic_columns,
         training_columns=self.training_columns,
         threshold=threshold,
@@ -759,11 +836,25 @@ class AutoLinker:
         result.update({k:v})
 
       return result
-    
+
     # initialise trials and create hyperopt space
     self.trials = Trials()
-    space = self._create_hyperopt_space(data, attribute_columns, comparison_size_limit)
-    
+
+    # turn off AQE for the blocking rule estimation process
+    self.spark.conf.set("spark.databricks.optimizer.adaptive.enabled", 'False')
+    if self.linker_mode == "dedupe_only":
+      space = self._create_hyperopt_space(self._autolink_data, self.attribute_columns, comparison_size_limit, sample_for_blocking_rules)
+    else:
+      # use the larger dataframe as baseline
+      df0_size = self._autolink_data[0].count()
+      df1_size = self._autolink_data[1].count()
+      if df0_size < df1_size:
+        space = self._create_hyperopt_space(self._autolink_data[1], self.attribute_columns, comparison_size_limit, sample_for_blocking_rules)
+      else:
+        space = self._create_hyperopt_space(self._autolink_data[0], self.attribute_columns, comparison_size_limit, sample_for_blocking_rules)
+
+    # turn AQE back on once we're out of scala
+    self.spark.conf.set("spark.databricks.optimizer.adaptive.enabled", 'True')
       # run hyperopt trials
     self.best = fmin(
         fn=tune_model,
@@ -778,7 +869,7 @@ class AutoLinker:
     best_param_for_rt = self._convert_hyperopt_to_splink()
     
     self.best_run_id = self.trials.best_trial["result"]["run_id"]
-    self.best_linker, self.best_predictions_df = self.train_linker(data, best_param_for_rt, attribute_columns, unique_id, self.training_columns)
+    self.best_linker, self.best_predictions_df = self.train_linker(self._autolink_data, best_param_for_rt, self.attribute_columns, self.unique_id, self.training_columns)
 
     
     # return succes text
@@ -789,9 +880,177 @@ class AutoLinker:
     """
 
     print(success_text)
-    
     return None
-  
+
+  def _get_spark(
+          self
+          ,autolink_data: typing.Union[pyspark.sql.dataframe.DataFrame, list]
+  ):
+    # extract spark from input data
+    if type(autolink_data) == list:
+      spark = autolink_data[0].sparkSession
+    else:
+      spark = autolink_data.sparkSession
+    return spark
+  def _get_catalog(self, spark):
+    return spark.catalog.currentCatalog()
+
+  def _get_schema(self, spark):
+    return spark.catalog.currentDatabase()
+
+  def _set_mlflow_experiment_name(self, spark):
+    username = spark.sql('select current_user() as user').collect()[0]['user']
+    experiment_name =  f"/Users/{username}/Databricks Autolinker {str(datetime.now())}"
+    return experiment_name
+
+  def _create_attribute_columns(
+          self
+          ,autolink_data
+  ):
+    """
+    Called only when an autolink process is initiated, this function will calculate which attribute columns to use and
+    do the necessary remapping work.
+    Returns
+    -------
+
+    """
+    data = autolink_data
+    if type(data) == list:
+      s1 = set(data[0].columns)
+      s2 = set(data[1].columns)
+      if s1 == s2:
+        attribute_columns = data[0].columns
+      else:
+        # sort tables so the one with fewer columns is first.
+        data.sort(key=lambda x: -len(x.columns))
+        # do remappings
+        remappings = self.estimate_linking_columns(data)
+        data[0] = data[0].selectExpr("*", *[f"{x[0]} as {x[2]}" for x in remappings])
+        data[1] = data[1].selectExpr("*", *[f"{x[1]} as {x[2]}" for x in remappings])
+        # finally, set attribute columns
+        attribute_columns = [x[2] for x in remappings]
+    else:
+      attribute_columns = self.estimate_clustering_columns(data)
+    return attribute_columns, data
+
+  def _get_rowcounts(self, linker_mode, autolink_data):
+    if linker_mode == "dedupe_only":
+      data_rowcount = autolink_data.count()
+    else:
+      # use the larger dataframe as baseline
+      df0_size = autolink_data[0].count()
+      df1_size = autolink_data[1].count()
+      if df0_size < df1_size:
+        data_rowcount = df1_size
+      else:
+        data_rowcount = df0_size
+    return data_rowcount
+
+  def _set_unique_id(self, autolink_data):
+    if type(autolink_data) == list:
+      autolink_data[0] = autolink_data[0].withColumn("unique_id", F.monotonically_increasing_id())
+      autolink_data[1] = autolink_data[1].withColumn("unique_id", F.monotonically_increasing_id())
+    else:
+      autolink_data = autolink_data.withColumn("unique_id", F.monotonically_increasing_id())
+
+    return autolink_data
+
+
+  def _evaluate_data_input_arg(
+          self,
+          data: typing.Union[pyspark.sql.dataframe.DataFrame, list]
+  ):
+    # evaluate input argument of data
+    _data_error_message = "The data argument accepts a single spark dataframe for deduplication, or a list of 2 " \
+                          "spark dataframes for linking"
+    if type(data) not in set([pyspark.sql.dataframe.DataFrame, list]):
+      raise ValueError(_data_error_message)
+    if type(data) is list:
+      data_len = len(data)
+      data_types = {type(x) for x in data}
+      if data_len != 2:
+        raise ValueError(_data_error_message)
+      if len(data_types) != 1:
+        raise ValueError(_data_error_message)
+      if data_types.pop() != pyspark.sql.dataframe.DataFrame:
+        raise ValueError(_data_error_message)
+
+  def estimate_linking_columns(
+          self
+          ,data: list
+  ):
+    '''
+    This function estimates the attribute columns for linking 2 datasets. It does this by joining each dataset on each
+    column to every other column, and choosing the pairing with the highest count.
+
+    Parameters
+    ----------
+    data : 2 spark dataframes which will be linked
+
+    Returns
+    - a mapping of the 2 tables to a standard schema.
+    -------
+
+    '''
+    columns = [list(filter(lambda x: x != self.unique_id, x.columns)) for x in data]
+
+    # write sql to lowercase and remove all non alpha-numeric characters
+    cleaning_sql = 'lower(regexp_replace({column},  "[^0-9a-zA-Z]+", "")) as {column}'
+    sqls = [list(map(lambda x: cleaning_sql.format(column=x), y)) for y in columns]
+
+    # apply sql
+    cleaned_data = [
+      data[0].selectExpr(sqls[0]),
+      data[1].selectExpr(sqls[1])
+    ]
+
+    # cross product of column names to get all the joins.
+    # remove reversed duplicates (A,B) == (B, A)
+    column_joins = itertools.product(*columns)
+    final_joins = set()
+    for x in column_joins:
+      if (x[1], x[0]) not in final_joins:
+        final_joins.add(x)
+
+    # loop through the final joins and store the counts with the join criteria
+    results = []
+    for x in final_joins:
+      results.append([*x, cleaned_data[0].join(cleaned_data[1], on=cleaned_data[0][x[0]]==cleaned_data[1][x[1]], how="inner").count()])
+    # sort the results to get an ordered list of (cola, colb, count) ordered by cola and count descending
+    results.sort(key=lambda x: (x[0], -x[2]))
+
+    # find the column comparison with the highest count
+    comparisons = [results[0]]
+    for x in results[1:]:
+      if x[0] == comparisons[-1][0]:
+        pass
+      else:
+        comparisons.append(x)
+
+    # create mapping of old names to new names
+    updated_name_mappings = []
+    for x in comparisons:
+      updated_name_mappings.append([x[0], x[1], "".join([x[0], x[1]])])
+
+    return updated_name_mappings
+
+  def estimate_clustering_columns(
+          self
+          , data: pyspark.sql.dataframe.DataFrame
+  ):
+    '''
+    Use all values as attributes for deduping.
+    This method is in place in case we want to do something different in future.
+    Parameters
+    ----------
+    data :
+
+    Returns
+    -------
+
+    '''
+    return data.columns
+
   def get_best_splink_model(self):
     """
     Get the underlying Splink model from the MLFlow Model Registry. Useful for advanced users wishing to access Splink's
@@ -1008,3 +1267,16 @@ class AutoLinker:
     }
 
     return cluster_scores
+
+  def delete_all_linking_experiments(self):
+    if input("WARNING - this will delete all your ARC generated MLFlow experiments, Type 'YES' to proceed" ) != "YES":
+      return
+    username = self.spark.sql('select current_user() as user').collect()[0]['user']
+    pattern = f"%{username}/Databricks Autolinker%"
+
+    client = MlflowClient()
+    experiments = (
+      client.search_experiments(filter_string=f"name LIKE '{pattern}'")
+    )  # returns a list of mlflow.entities.Experiment
+    for exp in experiments:
+      client.delete_experiment(exp.experiment_id)
