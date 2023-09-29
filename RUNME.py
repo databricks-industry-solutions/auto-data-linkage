@@ -44,7 +44,7 @@ job_json = {
         {
             "job_cluster_key": "auto_data_linkage_cluster",
             "notebook_task": {
-                "notebook_path": f"01_Run_Example_Linking"
+                "notebook_path": f"01_Run_Example_Deduplication"
             },
             "task_key": "auto_data_linkage_01"
         }
