@@ -188,7 +188,7 @@ class AutoLinker:
     """
 
     # Calculate count of rows in each cluster and rejoin
-    cluster_counts = clusters.groupBy(-"cluster_id").count().withColumnRenamed("count", "_cluster_count")
+    cluster_counts = clusters.groupBy("cluster_id").count().withColumnRenamed("count", "_cluster_count")
     data = clusters.join(cluster_counts, on=["cluster_id"], how="left")
     
     # Number of non-singleton clusters (for entropy base)
