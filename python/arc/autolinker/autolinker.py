@@ -14,7 +14,8 @@ import splink
 from splink.spark.spark_linker import SparkLinker
 import splink.spark.spark_comparison_library as cl
 
-import hyperopt
+from ..sql import enable_arc
+
 from hyperopt import fmin, tpe, hp, STATUS_OK, Trials
 
 from . import splink_mlflow
@@ -100,6 +101,7 @@ class AutoLinker:
     self.unique_id = None
     self.linker_mode = None
 
+    enable_arc()
 
   def __str__(self):
     return f"AutoLinker instance working in {self.catalog}.{self.schema} and MLflow experiment {self.experiment_name}"
