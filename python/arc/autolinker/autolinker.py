@@ -796,9 +796,14 @@ class AutoLinker:
       self.experiment_name = self._set_mlflow_experiment_name(self.spark)
     mlflow.set_experiment(self.experiment_name)
 
+    # set unique id if not provided
+    if not self.unique_id:
+      self._autolink_data = self._set_unique_id(self._autolink_data)
+      self.unique_id = "unique_id"
     # set attribute columns if not provided
+
     if not self.attribute_columns:
-      self.attribute_columns, self._autolink_data = self._create_attribute_columns(self._autolink_data)
+      self.attribute_columns, self._autolink_data = self._create_attribute_columns(self._autolink_data, self.unique_id)
 
 
     # Count rows in data - doing this here so we only do it once
@@ -811,10 +816,7 @@ class AutoLinker:
       ,self.attribute_columns
     )
 
-    # set unique id if not provided
-    if not self.unique_id:
-      self._autolink_data = self._set_unique_id(self._autolink_data)
-      self.unique_id = "unique_id"
+
 
 
     
@@ -908,6 +910,7 @@ class AutoLinker:
   def _create_attribute_columns(
           self
           ,autolink_data
+          ,unique_id
   ):
     """
     Called only when an autolink process is initiated, this function will calculate which attribute columns to use and
@@ -927,8 +930,8 @@ class AutoLinker:
         data.sort(key=lambda x: -len(x.columns))
         # do remappings
         remappings = self.estimate_linking_columns(data)
-        data[0] = data[0].selectExpr("*", *[f"{x[0]} as {x[2]}" for x in remappings])
-        data[1] = data[1].selectExpr("*", *[f"{x[1]} as {x[2]}" for x in remappings])
+        data[0] = data[0].selectExpr(unique_id, *[f"{x[0]} as {x[2]}" for x in remappings])
+        data[1] = data[1].selectExpr(unique_id, *[f"{x[1]} as {x[2]}" for x in remappings])
         # finally, set attribute columns
         attribute_columns = [x[2] for x in remappings]
     else:
