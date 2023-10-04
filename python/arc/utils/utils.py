@@ -1,6 +1,6 @@
 from mlflow import MlflowClient
 
-def delete_all_default_linking_experiments():
+def delete_all_default_linking_experiments(spark):
     '''
     This method removes all MLFlow experiments created by ARC with the default naming convention.
     Parameters
@@ -12,7 +12,6 @@ def delete_all_default_linking_experiments():
     '''
     if input("WARNING - this will delete all your ARC generated MLFlow experiments, Type 'YES' to proceed") != "YES":
         return
-    spark = globals()["spark"]
     username = spark.sql('select current_user() as user').collect()[0]['user']
     pattern = f"%{username}/Databricks Autolinker%"
 
