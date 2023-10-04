@@ -2,7 +2,7 @@ from mlflow import MlflowClient
 
 def delete_all_default_linking_experiments():
     '''
-    This method removes all linking experiments created by ARC with the default naming convention.
+    This method removes all MLFlow experiments created by ARC with the default naming convention.
     Parameters
     ----------
 
