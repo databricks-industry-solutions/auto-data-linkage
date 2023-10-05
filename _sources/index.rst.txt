@@ -13,6 +13,7 @@ Documentation
    :titlesonly:
    :maxdepth: 2
    :caption: Contents:
+   usage/usage
 
 
 AutoLinker
