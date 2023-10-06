@@ -14,10 +14,14 @@ jobs:
     environment:
       name: testpypi
       url: https://test.pypi.org/p/databricks-arc/
+    permissions:
+      id-token: write  # IMPORTANT: mandatory for trusted publishing
 
     steps:
       - name: checkout code
         uses: actions/checkout@v2
+      - name: build jar
+        uses: ./.github/actions/scala_build
       - name: build python
         uses: ./.github/actions/python_build
       - name: Publish a Python distribution to PyPI
@@ -25,4 +29,5 @@ jobs:
         with:
           user: __token__
           password: ${{ secrets.TEST_PYPI_TOKEN }}
-          packages_dir: python/dist/
+          packages-dir: python/dist/
+          repository-url: https://test.pypi.org/legacy/
