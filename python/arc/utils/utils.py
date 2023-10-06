@@ -3,8 +3,9 @@ from mlflow import MlflowClient
 def delete_all_default_linking_experiments(spark):
     '''
     This method removes all MLFlow experiments created by ARC with the default naming convention.
-    Parameters
-    ----------
+
+    :param spark: a spark object. available by default in databricks.
+
 
     Returns
     -------
