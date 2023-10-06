@@ -51,7 +51,7 @@ job_json = {
         {
             "job_cluster_key": "auto_data_linkage_cluster",
             "notebook_task": {
-                "notebook_path": f"deduplication_test.py"
+                "notebook_path": f"deduplication_test"
             },
             "task_key": "auto_data_linkage_02"
         }
