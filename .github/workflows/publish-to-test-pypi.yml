@@ -18,6 +18,8 @@ jobs:
     steps:
       - name: checkout code
         uses: actions/checkout@v2
+      - name: build jar
+        uses: ./.github/actions/scala_build
       - name: build python
         uses: ./.github/actions/python_build
       - name: Publish a Python distribution to PyPI
