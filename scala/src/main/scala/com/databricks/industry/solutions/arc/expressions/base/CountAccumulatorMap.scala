@@ -9,7 +9,7 @@ case class CountAccumulatorMap(counter: Map[String, Long]) extends Serializable 
     def this() = this(Map.empty)
 
     def merge(other: CountAccumulatorMap): CountAccumulatorMap = {
-        val newKeys = other.filter(_._2 > 1).keySet ++ counter.filter(_._2 > 1).keySet
+        val newKeys = other.map.filter(_._2 > 1).keySet ++ counter.map.filter(_._2 > 1).keySet
         val newMap = newKeys.map { k => k -> (other.counter.getOrElse(k, 0L) + counter.getOrElse(k, 0L)) }.toMap
         CountAccumulatorMap(newMap)
     }
