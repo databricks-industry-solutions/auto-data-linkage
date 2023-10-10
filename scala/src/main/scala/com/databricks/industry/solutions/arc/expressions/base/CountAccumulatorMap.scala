@@ -15,7 +15,7 @@ case class CountAccumulatorMap(counter: Map[String, Long]) extends Serializable 
         if (newMap_pre_2.isEmpty) {
             val newMap = counter.take(Math.min(counter.size, 10))
         } else {
-            val newMap = newMap_pre2
+            val newMap = newMap_pre_2
         }
         CountAccumulatorMap(newMap)
     }
