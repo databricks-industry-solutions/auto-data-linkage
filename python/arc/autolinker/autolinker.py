@@ -425,11 +425,11 @@ class AutoLinker:
   ) -> typing.Union[pyspark.sql.dataframe.DataFrame, list]:
     # Clean the data
     if linker_mode == "dedupe_only":
-      output_data = self._clean_columns(autolink_data, attribute_columns)
+      output_data = self._clean_columns(autolink_data, attribute_columns).cache()
     else:
       output_data = [
-        self._clean_columns(autolink_data[0], attribute_columns),
-        self._clean_columns(autolink_data[1], attribute_columns)
+        self._clean_columns(autolink_data[0], attribute_columns).cache(),
+        self._clean_columns(autolink_data[1], attribute_columns).cache()
       ]
     return output_data
 
