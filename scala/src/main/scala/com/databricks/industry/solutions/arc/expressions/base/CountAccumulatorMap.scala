@@ -13,9 +13,9 @@ case class CountAccumulatorMap(counter: Map[String, Long]) extends Serializable 
         val newMap_pre = newKeys.map { k => k -> (other.counter.getOrElse(k, 0L) + counter.getOrElse(k, 0L)) }.toMap
         val newMap_pre_2 = newMap_pre.filter(_._2 > 1)
         if (newMap_pre_2.isEmpty) {
-            newMap = counter.take(Math.min(counter.size, 10))
+            val newMap = counter.take(Math.min(counter.size, 10))
         } else {
-            newMap = newMap_pre2
+            val newMap = newMap_pre2
         }
         CountAccumulatorMap(newMap)
     }
