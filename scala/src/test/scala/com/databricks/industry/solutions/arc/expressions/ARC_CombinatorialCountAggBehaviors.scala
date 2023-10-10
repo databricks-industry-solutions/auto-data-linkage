@@ -35,7 +35,7 @@ trait ARC_CombinatorialCountAggBehaviors extends QueryTest {
             .take(1)
             .head
 
-      result.length should be > 0
+      require(result.isEmpty == false)
 
 
     }
@@ -73,7 +73,7 @@ trait ARC_CombinatorialCountAggBehaviors extends QueryTest {
             .take(1)
             .head
 
-      result.length should be > 0
+      require(result.isEmpty == false)
     }
 
 }
