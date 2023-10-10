@@ -34,7 +34,9 @@ case class ARC_CombinatorialCountAgg(
     }
 
     override def merge(buffer: CountAccumulatorMap, input: CountAccumulatorMap): CountAccumulatorMap = {
-        buffer.merge(input)
+        val pre = buffer.merge(input).counter
+        val valid_count = pre.filter(_._2 > 1)
+        CountAccumulatorMap(valid_count)
     }
 
     override def eval(buffer: CountAccumulatorMap): Any = {
