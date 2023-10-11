@@ -22,7 +22,7 @@ def get_function(name):
     return jf
 
 
-def arc_combinatorial_count_agg(nc, *attributes: str) -> Column:
+def arc_combinatorial_count_agg(nc, t, *attributes: str) -> Column:
     """
     Call arc_combinatorial_count_agg function on the provided attributes.
 
@@ -37,7 +37,7 @@ def arc_combinatorial_count_agg(nc, *attributes: str) -> Column:
 
     """
     jf = get_function("arc_combinatorial_count_agg")
-    return Column(jf(nc, attributes))
+    return Column(jf(nc, attributes, t))
 
 
 def arc_merge_count_map_agg(map_col: ColumnOrName) -> Column:

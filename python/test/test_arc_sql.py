@@ -8,7 +8,7 @@ class TestARC_SQL(ArcTestCase):
         df = self.mock_data()
 
         df.select(
-            f.arc_combinatorial_count_agg(2, "col1", "col2", "col3", "col4").alias("count_map")
+            f.arc_combinatorial_count_agg(2, 1, "col1", "col2", "col3", "col4").alias("count_map")
         ).show()
 
         df.select(

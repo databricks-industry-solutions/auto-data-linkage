@@ -11,7 +11,8 @@ case class ARC_CombinatorialCountAgg(
     attributeNames: Seq[String],
     nCombination: Int = 2,
     mutableAggBufferOffset: Int = 0,
-    inputAggBufferOffset: Int = 0
+    inputAggBufferOffset: Int = 0,
+    threshold: Int = 1
 ) extends TypedImperativeAggregate[CountAccumulatorMap] {
 
     private val attributeMap = attributeNames.zip(attributeExprs).toMap
@@ -34,11 +35,14 @@ case class ARC_CombinatorialCountAgg(
     }
 
     override def merge(buffer: CountAccumulatorMap, input: CountAccumulatorMap): CountAccumulatorMap = {
-        buffer.merge(input)
+        val pre = buffer.merge(input).counter
+        val valid_count = pre.filter(_._2 > threshold)
+        CountAccumulatorMap(valid_count)
     }
 
     override def eval(buffer: CountAccumulatorMap): Any = {
-        val result = Utils.buildMapLong(buffer.counter)
+        val counter = buffer.counter.toList.sortBy(c => -c._2).take(1000).toMap
+        val result = Utils.buildMapLong(counter)
         result
     }
 
