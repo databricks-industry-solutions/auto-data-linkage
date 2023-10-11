@@ -12,7 +12,7 @@ jobs:
      - name: Run a databricks notebook
        uses: databricks/run-notebook@v0
        with:
-         local-notebook-path: RUNME.py
+         local-notebook-path: integration-tests/RUN_TESTS.py
          git-commit: ${{ github.event.pull_request.head.sha }}
          databricks-host: https://416411475796958.8.gcp.databricks.com
          databricks-token: ${{ secrets.DEPLOYMENT_TARGET_TOKEN_GCP }}
