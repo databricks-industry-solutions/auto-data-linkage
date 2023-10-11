@@ -15,7 +15,7 @@ jobs:
      - name: Run a databricks notebook
        uses: databricks/run-notebook@v0
        with:
-         local-notebook-path: RUNME.py
+         local-notebook-path: integration-tests/RUN_TESTS.py
          git-commit: ${{ github.sha }}
          databricks-host: https://adb-984752964297111.11.azuredatabricks.net
          databricks-token: ${{ secrets.DEPLOYMENT_TARGET_TOKEN_MSA }}
