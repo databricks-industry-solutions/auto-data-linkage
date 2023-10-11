@@ -8,10 +8,16 @@ import org.apache.spark.sql.functions._
 object ARC {
 
     def generateCountLookup(df: DataFrame, k: Int, attributes: Seq[String]): DataFrame = {
+        val df_size = df.count
+        val df_partitions = df.rdd.getNumPartitions
+        val min_size = df_size * 0.2
+        val threshold = (min_size / df_partitions).toInt
+
+
         val window = Window.partitionBy(col("rule"))
         df
             .select(
-              arc_combinatorial_count_agg(k, attributes: _*) as "combinations"
+              arc_combinatorial_count_agg(k, threshold, attributes: _*) as "combinations"
             )
             .select(
               explode(
