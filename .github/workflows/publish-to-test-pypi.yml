@@ -31,5 +31,8 @@ jobs:
           password: ${{ secrets.TEST_PYPI_TOKEN }}
           packages-dir: python/dist/
           repository-url: https://test.pypi.org/legacy/
+  run-tests:
+    - needs: build-n-publish
+    - steps:
       - name: integration tests
         uses: ./.github/actions/integration_tests
