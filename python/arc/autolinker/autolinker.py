@@ -283,7 +283,7 @@ class AutoLinker:
     data = data.fillna("null_")
 
     # Create blocking rules and size esimates
-    df_rules = arcf.arc_generate_blocking_rules(data, max_columns_per_and_rule, max_rules_per_or_rule, *attribute_columns)
+    df_rules = arcf.arc_generate_blocking_rules(data, max_columns_per_and_rule, max_rules_per_or_rule, *attribute_columns).cache()
 
     # Filter on max
     rules = df_rules.filter(f"rule_squared_count < {comparison_size_limit}").collect()
@@ -293,6 +293,7 @@ class AutoLinker:
     # set deterministic rules to be 500th largest (or largest) blocking rule
     self.deterministic_columns = df_rules.orderBy(F.col("rule_squared_count")).limit(500).orderBy(F.col("rule_squared_count").desc()).limit(1).collect()[0]["splink_rule"]
 
+    df_rules.unpersist()
           
     return accepted_rules
 

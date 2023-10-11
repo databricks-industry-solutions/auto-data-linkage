@@ -42,7 +42,7 @@ case class ARC_CombinatorialCountAgg(
 
     override def eval(buffer: CountAccumulatorMap): Any = {
         val counter = buffer.counter.toList.sortBy(c => -c._2).take(1000).toMap
-        val result = Utils.buildMapLong(buffer.counter)
+        val result = Utils.buildMapLong(counter)
         result
     }
 
