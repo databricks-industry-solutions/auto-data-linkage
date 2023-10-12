@@ -58,6 +58,9 @@ object ARC {
         arc_generate_combinations(n, col("rules")) as "combinations",
         col("rules")
       )
+      .withColumn("partial_count", arc_estimate_squared_count_or(col("combinations"), countMap))
+      .orderBy(desc("partial_count"))
+      .limit(1000)
 
     val combinations =
       if (n > 1) {
