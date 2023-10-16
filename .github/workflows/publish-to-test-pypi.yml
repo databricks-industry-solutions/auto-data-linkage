@@ -1,4 +1,4 @@
-name: Publish Python 🐍 distribution 📦 to PyPI and TestPyPI
+name: Publish Python 🐍 distribution 📦 to TestPyPI and run integration tests
 
 on:
   pull_request:
@@ -31,3 +31,8 @@ jobs:
           password: ${{ secrets.TEST_PYPI_TOKEN }}
           packages-dir: python/dist/
           repository-url: https://test.pypi.org/legacy/
+  run-tests:
+    - needs: build-n-publish
+    - steps:
+      - name: integration tests
+        uses: ./.github/actions/integration_tests
