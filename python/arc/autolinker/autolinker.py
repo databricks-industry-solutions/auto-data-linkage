@@ -816,10 +816,6 @@ class AutoLinker:
       ,self.linker_mode
       ,self.attribute_columns
     )
-
-
-
-
     
     # define objective function
     def tune_model(space):
@@ -928,7 +924,7 @@ class AutoLinker:
       s2 = set(data[1].columns)
       if s1 == s2:
         attribute_columns = data[0].columns
-        attribute_columns = list(filter(lambda x: x != unique_id or x != true_label, attribute_columns))
+        attribute_columns = list(filter(lambda x: x != unique_id and x != true_label, attribute_columns))
       else:
         # sort tables so the one with fewer columns is first.
         data.sort(key=lambda x: -len(x.columns))
@@ -1073,7 +1069,7 @@ class AutoLinker:
     -------
 
     '''
-    attribute_columns = list(filter(lambda x: x not in set(unique_id, true_label), data.columns))
+    attribute_columns = list(filter(lambda x: x != unique_id and x != true_label, data.columns))
     return attribute_columns
 
   def get_best_splink_model(self):
