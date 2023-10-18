@@ -953,6 +953,7 @@ class AutoLinker:
       autolink_data[1] = autolink_data[1].withColumn("unique_id", F.monotonically_increasing_id())
     else:
       autolink_data = autolink_data.withColumn("unique_id", F.monotonically_increasing_id())
+      autolink_data = autolink_data.withColumn("unique_id", F.col("unique_id").cast("string"))
 
     return autolink_data
 
