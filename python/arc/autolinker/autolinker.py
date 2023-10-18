@@ -799,7 +799,12 @@ class AutoLinker:
     # set attribute columns if not provided
 
     if not self.attribute_columns:
-      self.attribute_columns, self._autolink_data = self._create_attribute_columns(self._autolink_data, self.unique_id)
+      self.attribute_columns, self._autolink_data = self._create_attribute_columns(
+        self._autolink_data
+        , self.unique_id
+        , true_label
+
+      )
 
 
     # Count rows in data - doing this here so we only do it once
@@ -907,6 +912,8 @@ class AutoLinker:
           self
           ,autolink_data
           ,unique_id
+          ,true_label
+
   ):
     """
     Called only when an autolink process is initiated, this function will calculate which attribute columns to use and
@@ -921,13 +928,22 @@ class AutoLinker:
       s2 = set(data[1].columns)
       if s1 == s2:
         attribute_columns = data[0].columns
+        attribute_columns = list(filter(lambda x: x != unique_id or x != true_label, attribute_columns))
       else:
         # sort tables so the one with fewer columns is first.
         data.sort(key=lambda x: -len(x.columns))
         # do remappings
-        remappings = self.estimate_linking_columns(data)
-        data[0] = data[0].selectExpr(unique_id, *[f"{x[0]} as {x[2]}" for x in remappings])
-        data[1] = data[1].selectExpr(unique_id, *[f"{x[1]} as {x[2]}" for x in remappings])
+        remappings = self.estimate_linking_columns(
+          data
+          ,unique_id
+          ,true_label
+        )
+        if true_label:
+          data[0] = data[0].selectExpr(unique_id, true_label, *[f"{x[0]} as {x[2]}" for x in remappings])
+          data[1] = data[1].selectExpr(unique_id, true_label, *[f"{x[1]} as {x[2]}" for x in remappings])
+        else:
+          data[0] = data[0].selectExpr(unique_id, *[f"{x[0]} as {x[2]}" for x in remappings])
+          data[1] = data[1].selectExpr(unique_id, *[f"{x[1]} as {x[2]}" for x in remappings])
         # finally, set attribute columns
         attribute_columns = [x[2] for x in remappings]
     else:
@@ -982,6 +998,8 @@ class AutoLinker:
   def estimate_linking_columns(
           self
           ,data: list
+          ,unique_id: str
+          ,true_label: str
   ):
     '''
     This function estimates the attribute columns for linking 2 datasets. It does this by joining each dataset on each
@@ -996,7 +1014,7 @@ class AutoLinker:
     -------
 
     '''
-    columns = [list(filter(lambda x: x != self.unique_id, x.columns)) for x in data]
+    columns = [list(filter(lambda x: x != unique_id and x != true_label, x.columns)) for x in data]
 
     # write sql to lowercase and remove all non alpha-numeric characters
     cleaning_sql = 'lower(regexp_replace({column},  "[^0-9a-zA-Z]+", "")) as {column}'
@@ -1041,6 +1059,8 @@ class AutoLinker:
   def estimate_clustering_columns(
           self
           , data: pyspark.sql.dataframe.DataFrame
+          ,unique_id
+          ,true_label
   ):
     '''
     Use all values as attributes for deduping.
@@ -1053,7 +1073,8 @@ class AutoLinker:
     -------
 
     '''
-    return data.columns
+    attribute_columns = list(filter(lambda x: x not in set(unique_id, true_label), data.columns))
+    return attribute_columns
 
   def get_best_splink_model(self):
     """
