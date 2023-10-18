@@ -950,7 +950,9 @@ class AutoLinker:
   def _set_unique_id(self, autolink_data):
     if type(autolink_data) == list:
       autolink_data[0] = autolink_data[0].withColumn("unique_id", F.monotonically_increasing_id())
+      autolink_data[0] = autolink_data[0].withColumn("unique_id", F.col("unique_id").cast("string"))
       autolink_data[1] = autolink_data[1].withColumn("unique_id", F.monotonically_increasing_id())
+      autolink_data[1] = autolink_data[1].withColumn("unique_id", F.col("unique_id").cast("string"))
     else:
       autolink_data = autolink_data.withColumn("unique_id", F.monotonically_increasing_id())
       autolink_data = autolink_data.withColumn("unique_id", F.col("unique_id").cast("string"))
