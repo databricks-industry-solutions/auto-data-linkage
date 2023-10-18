@@ -651,7 +651,8 @@ class AutoLinker:
       k = max([data.groupBy(cn).count().count() for cn in attribute_columns])
     else:
       df = data[0].union(data[1])
-      k = max([df.groupBy(cn).count().count() for cn in attribute_columns])
+      data = df
+      k = max([data.groupBy(cn).count().count() for cn in attribute_columns])
 
     clusters = linker.cluster_pairwise_predictions_at_threshold(predictions, threshold_match_probability=threshold)
     df_clusters = clusters.as_spark_dataframe()
