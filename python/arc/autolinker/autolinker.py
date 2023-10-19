@@ -727,6 +727,7 @@ class AutoLinker:
       splink_mlflow.log_splink_model_to_mlflow(linker, "linker")
       mlflow.log_metrics(evals)
       mlflow.log_metric("training_duration", duration)
+      mlflow.log_metric("run_start_time", start)
       params = space.copy()
       params["deterministic_columns"] = self.deterministic_columns
       params["training_columns"] = self.training_columns
