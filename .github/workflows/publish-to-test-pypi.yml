@@ -32,8 +32,9 @@ jobs:
           packages-dir: python/dist/
           repository-url: https://test.pypi.org/legacy/
   run-tests:
-    - name: run integration tests
-    - needs: build-n-publish
-    - steps:
+    name: run integration tests
+    needs: build-n-publish
+    runs-on: ubuntu-20.04
+    steps:
       - name: integration tests
         uses: ./.github/actions/integration_tests
