@@ -7,8 +7,6 @@ jobs:
   build-n-publish:
     name: Build project and publish to TestPyPI
     runs-on: ubuntu-20.04
-    permissions:
-      id-token: write  # IMPORTANT: mandatory for trusted publishing
     strategy:
       matrix:
         python: [3.8.10]
@@ -16,6 +14,8 @@ jobs:
     environment:
       name: testpypi
       url: https://test.pypi.org/p/databricks-arc/
+    permissions:
+      id-token: write  # IMPORTANT: mandatory for trusted publishing
 
     steps:
       - name: checkout code
