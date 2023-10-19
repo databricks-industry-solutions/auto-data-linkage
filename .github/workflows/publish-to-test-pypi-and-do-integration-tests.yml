@@ -16,6 +16,7 @@ jobs:
       url: https://test.pypi.org/p/databricks-arc/
     permissions:
       id-token: write  # IMPORTANT: mandatory for trusted publishing
+      contents: read
 
     steps:
       - name: checkout code
