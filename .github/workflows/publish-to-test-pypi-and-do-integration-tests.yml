@@ -37,6 +37,8 @@ jobs:
     needs: build-n-publish
     runs-on: ubuntu-20.04
     steps:
+      - name: Checkout repo
+        uses: actions/checkout@v2
       - name: aws integration tests
         uses: ./.github/actions/integration_tests_aws
   run-gcp-test:
@@ -44,6 +46,8 @@ jobs:
     needs: build-n-publish
     runs-on: ubuntu-20.04
     steps:
+      - name: Checkout repo
+        uses: actions/checkout@v2
       - name: gcp integration tests
         uses: ./.github/actions/integration_tests_gcp
   run-msa-test:
@@ -51,5 +55,7 @@ jobs:
     needs: build-n-publish
     runs-on: ubuntu-20.04
     steps:
+      - name: Checkout repo
+        uses: actions/checkout@v2
       - name: msa integration tests
         uses: ./.github/actions/integration_tests_msa
