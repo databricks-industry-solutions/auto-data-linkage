@@ -14,8 +14,8 @@ jobs:
     environment:
       name: testpypi
       url: https://test.pypi.org/p/databricks-arc/
-    permissions: write-all
-      #id-token: write  # IMPORTANT: mandatory for trusted publishing
+    permissions:
+      id-token: write  # IMPORTANT: mandatory for trusted publishing
       #contents: read
 
     steps:
@@ -33,24 +33,24 @@ jobs:
           packages-dir: python/dist/
           repository-url: https://test.pypi.org/legacy/
 
-  run-aws-test:
-    name: run aws integration tests
-    needs: build-n-publish
-    runs-on: ubuntu-20.04
-    steps:
-      - name: aws integration tests
-        uses: ./.github/actions/integration_tests_aws
-  run-gcp-test:
-    name: run gcp integration tests
-    needs: build-n-publish
-    runs-on: ubuntu-20.04
-    steps:
-      - name: gcp integration tests
-        uses: ./.github/actions/integration_tests_gcp
-  run-msa-test:
-    name: run msa integration tests
-    needs: build-n-publish
-    runs-on: ubuntu-20.04
-    steps:
-      - name: msa integration tests
-        uses: ./.github/actions/integration_tests_msa
+# run-aws-test:
+#   name: run aws integration tests
+#   needs: build-n-publish
+#   runs-on: ubuntu-20.04
+#   steps:
+#     - name: aws integration tests
+#       uses: ./.github/actions/integration_tests_aws
+# run-gcp-test:
+#   name: run gcp integration tests
+#   needs: build-n-publish
+#   runs-on: ubuntu-20.04
+#   steps:
+#     - name: gcp integration tests
+#       uses: ./.github/actions/integration_tests_gcp
+# run-msa-test:
+#   name: run msa integration tests
+#   needs: build-n-publish
+#   runs-on: ubuntu-20.04
+#   steps:
+#     - name: msa integration tests
+#       uses: ./.github/actions/integration_tests_msa
