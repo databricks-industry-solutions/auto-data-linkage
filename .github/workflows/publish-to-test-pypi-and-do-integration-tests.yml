@@ -3,12 +3,12 @@ name: Publish Python 🐍 distribution 📦 to TestPyPI and run integration test
 on:
   pull_request:
 
-permissions:
-  id-token: write  # IMPORTANT: mandatory for trusted publishing
 jobs:
   build-n-publish:
     name: Build project and publish to TestPyPI
     runs-on: ubuntu-20.04
+    permissions:
+      id-token: write  # IMPORTANT: mandatory for trusted publishing
     strategy:
       matrix:
         python: [3.8.10]
