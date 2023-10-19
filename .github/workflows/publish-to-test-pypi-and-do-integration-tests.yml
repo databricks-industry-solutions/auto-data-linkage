@@ -3,6 +3,8 @@ name: Publish Python 🐍 distribution 📦 to TestPyPI and run integration test
 on:
   pull_request:
 
+permissions:
+  id-token: write  # IMPORTANT: mandatory for trusted publishing
 jobs:
   build-n-publish:
     name: Build project and publish to TestPyPI
@@ -29,8 +31,7 @@ jobs:
           password: ${{ secrets.TEST_PYPI_TOKEN }}
           packages-dir: python/dist/
           repository-url: https://test.pypi.org/legacy/
-          permissions:
-            id-token: write  # IMPORTANT: mandatory for trusted publishing
+
   run-aws-test:
     name: run aws integration tests
     needs: build-n-publish
