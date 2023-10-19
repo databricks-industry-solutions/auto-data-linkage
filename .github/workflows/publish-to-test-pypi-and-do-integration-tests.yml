@@ -40,16 +40,16 @@ jobs:
       - name: aws integration tests
         uses: ./.github/actions/integration_tests_aws
   run-gcp-test:
-    name: run aws integration tests
+    name: run gcp integration tests
     needs: build-n-publish
     runs-on: ubuntu-20.04
     steps:
-      - name: aws integration tests
+      - name: gcp integration tests
         uses: ./.github/actions/integration_tests_gcp
   run-msa-test:
-    name: run aws integration tests
+    name: run msa integration tests
     needs: build-n-publish
     runs-on: ubuntu-20.04
     steps:
-      - name: aws integration tests
+      - name: msa integration tests
         uses: ./.github/actions/integration_tests_msa
