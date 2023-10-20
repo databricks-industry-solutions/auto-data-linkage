@@ -42,7 +42,7 @@ jobs:
       - name: aws integration tests
         uses: ./.github/actions/integration_tests_aws
         with:
-          deployment_token: ${{ secrets.DEPLOYMENT_TARGET_TOKEN_AWS}}
+          deployment_token: ${{ secrets.DEPLOYMENT_TARGET_TOKEN_AWS }}
   run-gcp-test:
     name: run gcp integration tests
  #   needs: build-n-publish
@@ -53,7 +53,7 @@ jobs:
       - name: gcp integration tests
         uses: ./.github/actions/integration_tests_gcp
         with:
-          deployment_token: ${{ secrets.DEPLOYMENT_TARGET_TOKEN_GCP}}
+          deployment_token: ${{ secrets.DEPLOYMENT_TARGET_TOKEN_GCP }}
   run-msa-test:
     name: run msa integration tests
  #   needs: build-n-publish
@@ -64,4 +64,4 @@ jobs:
       - name: msa integration tests
         uses: ./.github/actions/integration_tests_msa
         with:
-          deployment_token: ${{ secrets.DEPLOYMENT_TARGET_TOKEN_MSA}}
+          deployment_token: ${{ secrets.DEPLOYMENT_TARGET_TOKEN_MSA }}
