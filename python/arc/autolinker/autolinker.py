@@ -712,7 +712,7 @@ class AutoLinker:
 
     #set start time for measuring training duration
     start = datetime.now()
-    start_seconds = round(datetime.datetime.today().timestamp())
+    start_seconds = round(datetime.today().timestamp())
     
     # Train model
     linker, predictions = self.train_linker(data, space, attribute_columns, unique_id, training_columns)
