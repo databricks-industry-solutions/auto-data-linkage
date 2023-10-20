@@ -40,9 +40,9 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v2
       - name: aws integration tests
-        uses: ./.github/actions/integration_tests_aws
         with:
           deployment_token: ${{ secrets.DEPLOYMENT_TARGET_TOKEN_AWS }}
+        uses: ./.github/actions/integration_tests_aws
   run-gcp-test:
     name: run gcp integration tests
  #   needs: build-n-publish
@@ -51,9 +51,9 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v2
       - name: gcp integration tests
-        uses: ./.github/actions/integration_tests_gcp
         with:
           deployment_token: ${{ secrets.DEPLOYMENT_TARGET_TOKEN_GCP }}
+        uses: ./.github/actions/integration_tests_gcp
   run-msa-test:
     name: run msa integration tests
  #   needs: build-n-publish
@@ -62,6 +62,6 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v2
       - name: msa integration tests
-        uses: ./.github/actions/integration_tests_msa
         with:
           deployment_token: ${{ secrets.DEPLOYMENT_TARGET_TOKEN_MSA }}
+        uses: ./.github/actions/integration_tests_msa
