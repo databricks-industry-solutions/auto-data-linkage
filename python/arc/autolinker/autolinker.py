@@ -650,13 +650,9 @@ class AutoLinker:
     if type(data) != list:
       k = max([data.groupBy(cn).count().count() for cn in attribute_columns])
     else:
-      # use the larger dataframe as baseline
-      df0_size = data[0].count()
-      df1_size = data[1].count()
-      if df0_size < df1_size:
-        k = max([data[1].groupBy(cn).count().count() for cn in attribute_columns])
-      else:
-        k = max([data[0].groupBy(cn).count().count() for cn in attribute_columns])
+      df = data[0].union(data[1])
+      data = df
+      k = max([data.groupBy(cn).count().count() for cn in attribute_columns])
 
     clusters = linker.cluster_pairwise_predictions_at_threshold(predictions, threshold_match_probability=threshold)
     df_clusters = clusters.as_spark_dataframe()
@@ -731,6 +727,7 @@ class AutoLinker:
       splink_mlflow.log_splink_model_to_mlflow(linker, "linker")
       mlflow.log_metrics(evals)
       mlflow.log_metric("training_duration", duration)
+      mlflow.log_metric("run_start_time", start)
       params = space.copy()
       params["deterministic_columns"] = self.deterministic_columns
       params["training_columns"] = self.training_columns
@@ -804,7 +801,12 @@ class AutoLinker:
     # set attribute columns if not provided
 
     if not self.attribute_columns:
-      self.attribute_columns, self._autolink_data = self._create_attribute_columns(self._autolink_data, self.unique_id)
+      self.attribute_columns, self._autolink_data = self._create_attribute_columns(
+        self._autolink_data
+        , self.unique_id
+        , true_label
+
+      )
 
 
     # Count rows in data - doing this here so we only do it once
@@ -816,10 +818,6 @@ class AutoLinker:
       ,self.linker_mode
       ,self.attribute_columns
     )
-
-
-
-
     
     # define objective function
     def tune_model(space):
@@ -912,6 +910,8 @@ class AutoLinker:
           self
           ,autolink_data
           ,unique_id
+          ,true_label
+
   ):
     """
     Called only when an autolink process is initiated, this function will calculate which attribute columns to use and
@@ -926,13 +926,22 @@ class AutoLinker:
       s2 = set(data[1].columns)
       if s1 == s2:
         attribute_columns = data[0].columns
+        attribute_columns = list(filter(lambda x: x != unique_id and x != true_label, attribute_columns))
       else:
         # sort tables so the one with fewer columns is first.
         data.sort(key=lambda x: -len(x.columns))
         # do remappings
-        remappings = self.estimate_linking_columns(data)
-        data[0] = data[0].selectExpr(unique_id, *[f"{x[0]} as {x[2]}" for x in remappings])
-        data[1] = data[1].selectExpr(unique_id, *[f"{x[1]} as {x[2]}" for x in remappings])
+        remappings = self.estimate_linking_columns(
+          data
+          ,unique_id
+          ,true_label
+        )
+        if true_label:
+          data[0] = data[0].selectExpr(unique_id, true_label, *[f"{x[0]} as {x[2]}" for x in remappings])
+          data[1] = data[1].selectExpr(unique_id, true_label, *[f"{x[1]} as {x[2]}" for x in remappings])
+        else:
+          data[0] = data[0].selectExpr(unique_id, *[f"{x[0]} as {x[2]}" for x in remappings])
+          data[1] = data[1].selectExpr(unique_id, *[f"{x[1]} as {x[2]}" for x in remappings])
         # finally, set attribute columns
         attribute_columns = [x[2] for x in remappings]
     else:
@@ -955,9 +964,12 @@ class AutoLinker:
   def _set_unique_id(self, autolink_data):
     if type(autolink_data) == list:
       autolink_data[0] = autolink_data[0].withColumn("unique_id", F.monotonically_increasing_id())
+      autolink_data[0] = autolink_data[0].withColumn("unique_id", F.col("unique_id").cast("string"))
       autolink_data[1] = autolink_data[1].withColumn("unique_id", F.monotonically_increasing_id())
+      autolink_data[1] = autolink_data[1].withColumn("unique_id", F.col("unique_id").cast("string"))
     else:
       autolink_data = autolink_data.withColumn("unique_id", F.monotonically_increasing_id())
+      autolink_data = autolink_data.withColumn("unique_id", F.col("unique_id").cast("string"))
 
     return autolink_data
 
@@ -984,6 +996,8 @@ class AutoLinker:
   def estimate_linking_columns(
           self
           ,data: list
+          ,unique_id: str
+          ,true_label: str
   ):
     '''
     This function estimates the attribute columns for linking 2 datasets. It does this by joining each dataset on each
@@ -998,7 +1012,7 @@ class AutoLinker:
     -------
 
     '''
-    columns = [list(filter(lambda x: x != self.unique_id, x.columns)) for x in data]
+    columns = [list(filter(lambda x: x != unique_id and x != true_label, x.columns)) for x in data]
 
     # write sql to lowercase and remove all non alpha-numeric characters
     cleaning_sql = 'lower(regexp_replace({column},  "[^0-9a-zA-Z]+", "")) as {column}'
@@ -1043,6 +1057,8 @@ class AutoLinker:
   def estimate_clustering_columns(
           self
           , data: pyspark.sql.dataframe.DataFrame
+          ,unique_id
+          ,true_label
   ):
     '''
     Use all values as attributes for deduping.
@@ -1055,7 +1071,8 @@ class AutoLinker:
     -------
 
     '''
-    return data.columns
+    attribute_columns = list(filter(lambda x: x != unique_id and x != true_label, data.columns))
+    return attribute_columns
 
   def get_best_splink_model(self):
     """
