@@ -1,17 +1,19 @@
 name: run integration tests
 description: runs linking and dedupe tests on AWS
+inputs:
+  deployment_token:
+    description: "Databricks PAT for running test"
+
 runs:
   using: "composite"
   steps:
-    - name: Checkout repo
-      uses: actions/checkout@v2
     - name: Run AWS test
       uses: databricks/run-notebook@v0
       with:
         local-notebook-path: integration-tests/RUN_TESTS.py
         git-commit: ${{ github.event.pull_request.head.sha }}
         databricks-host: https://e2-demo-west.cloud.databricks.com
-        databricks-token: ${{ secrets.DEPLOYMENT_TARGET_TOKEN_AWS }}
+        databricks-token: inputs.deployment_token
         new-cluster-json: >
           {
             "num_workers": 0,

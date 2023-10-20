@@ -4,37 +4,37 @@ on:
   pull_request:
 
 jobs:
-  build-n-publish:
-    name: Build project and publish to TestPyPI
-    runs-on: ubuntu-20.04
-    strategy:
-      matrix:
-        python: [3.8.10]
-        spark: [3.2.1]
-    environment:
-      name: testpypi
-      url: https://test.pypi.org/p/databricks-arc/
-    permissions:
-      id-token: write  # IMPORTANT: mandatory for trusted publishing
+# build-n-publish:
+#   name: Build project and publish to TestPyPI
+#   runs-on: ubuntu-20.04
+#   strategy:
+#     matrix:
+#       python: [3.8.10]
+#       spark: [3.2.1]
+#   environment:
+#     name: testpypi
+#     url: https://test.pypi.org/p/databricks-arc/
+#   permissions:
+#     id-token: write  # IMPORTANT: mandatory for trusted publishing
 
-    steps:
-      - name: checkout code
-        uses: actions/checkout@v2
-      - name: build jar
-        uses: ./.github/actions/scala_build
-      - name: build python
-        uses: ./.github/actions/python_build
-      - name: Publish a Python distribution to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          user: __token__
-          password: ${{ secrets.TEST_PYPI_TOKEN }}
-          packages-dir: python/dist/
-          repository-url: https://test.pypi.org/legacy/
+#   steps:
+#     - name: checkout code
+#       uses: actions/checkout@v2
+#     - name: build jar
+#       uses: ./.github/actions/scala_build
+#     - name: build python
+#       uses: ./.github/actions/python_build
+#     - name: Publish a Python distribution to PyPI
+#       uses: pypa/gh-action-pypi-publish@release/v1
+#       with:
+#         user: __token__
+#         password: ${{ secrets.TEST_PYPI_TOKEN }}
+#         packages-dir: python/dist/
+#         repository-url: https://test.pypi.org/legacy/
 
   run-aws-test:
     name: run aws integration tests
-    needs: build-n-publish
+#    needs: build-n-publish
     runs-on: ubuntu-20.04
     steps:
       - name: Checkout repo
@@ -43,7 +43,7 @@ jobs:
         uses: ./.github/actions/integration_tests_aws
   run-gcp-test:
     name: run gcp integration tests
-    needs: build-n-publish
+ #   needs: build-n-publish
     runs-on: ubuntu-20.04
     steps:
       - name: Checkout repo
@@ -52,7 +52,7 @@ jobs:
         uses: ./.github/actions/integration_tests_gcp
   run-msa-test:
     name: run msa integration tests
-    needs: build-n-publish
+ #   needs: build-n-publish
     runs-on: ubuntu-20.04
     steps:
       - name: Checkout repo
