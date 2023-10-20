@@ -712,6 +712,7 @@ class AutoLinker:
 
     #set start time for measuring training duration
     start = datetime.now()
+    start_seconds = round(datetime.datetime.today().timestamp())
     
     # Train model
     linker, predictions = self.train_linker(data, space, attribute_columns, unique_id, training_columns)
@@ -727,7 +728,7 @@ class AutoLinker:
       splink_mlflow.log_splink_model_to_mlflow(linker, "linker")
       mlflow.log_metrics(evals)
       mlflow.log_metric("training_duration", duration)
-      mlflow.log_metric("run_start_time", start)
+      mlflow.log_metric("run_start_time", start_seconds)
       params = space.copy()
       params["deterministic_columns"] = self.deterministic_columns
       params["training_columns"] = self.training_columns
