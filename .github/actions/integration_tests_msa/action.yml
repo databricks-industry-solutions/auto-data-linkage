@@ -13,7 +13,7 @@ runs:
         local-notebook-path: integration-tests/RUN_TESTS.py
         git-commit: ${{ github.event.pull_request.head.sha }}
         databricks-host: https://adb-984752964297111.11.azuredatabricks.net
-        databricks-token: inputs.deployment_token
+        databricks-token: ${{ inputs.deployment_token }}
         new-cluster-json: >
           {
             "num_workers": 0,
