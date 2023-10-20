@@ -406,7 +406,7 @@ Returns a dictionary.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="arc.autolinker.AutoLinker._create_attribute_columns">
-<span class="sig-name descname"><span class="pre">_create_attribute_columns</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">autolink_data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">unique_id</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.AutoLinker._create_attribute_columns" title="Permalink to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">_create_attribute_columns</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">autolink_data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">unique_id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">true_label</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.AutoLinker._create_attribute_columns" title="Permalink to this definition">¶</a></dt>
 <dd><p>Called only when an autolink process is initiated, this function will calculate which attribute columns to use and
 do the necessary remapping work.
 Returns
@@ -649,7 +649,7 @@ See this video for an indepth explanation of interpreting this dashboard: <a cla
 
 <dl class="py method">
 <dt class="sig sig-object py" id="arc.autolinker.AutoLinker.estimate_clustering_columns">
-<span class="sig-name descname"><span class="pre">estimate_clustering_columns</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.AutoLinker.estimate_clustering_columns" title="Permalink to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">estimate_clustering_columns</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">unique_id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">true_label</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.AutoLinker.estimate_clustering_columns" title="Permalink to this definition">¶</a></dt>
 <dd><p>Use all values as attributes for deduping.
 This method is in place in case we want to do something different in future.
 Parameters
@@ -664,7 +664,7 @@ data :</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="arc.autolinker.AutoLinker.estimate_linking_columns">
-<span class="sig-name descname"><span class="pre">estimate_linking_columns</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.AutoLinker.estimate_linking_columns" title="Permalink to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">estimate_linking_columns</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">unique_id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">true_label</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.AutoLinker.estimate_linking_columns" title="Permalink to this definition">¶</a></dt>
 <dd><p>This function estimates the attribute columns for linking 2 datasets. It does this by joining each dataset on each
 column to every other column, and choosing the pairing with the highest count.</p>
 <p>data : 2 spark dataframes which will be linked</p>
@@ -673,7 +673,11 @@ column to every other column, and choosing the pairing with the highest count.</
 ——-</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><p><strong>data</strong> (<em>list</em>) – </p>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data</strong> (<em>list</em>) – </p></li>
+<li><p><strong>unique_id</strong> (<em>str</em>) – </p></li>
+<li><p><strong>true_label</strong> (<em>str</em>) – </p></li>
+</ul>
 </dd>
 </dl>
 </dd></dl>
