@@ -404,9 +404,9 @@ class AutoLinker:
       cleaning = {col: ["lower", "alphanumeric_only"] for col in attribute_columns}
       
     for col, methods in cleaning.items():
-      # if column is not a string, skip it
+      # if column is not a string, cast to string
       if not data.schema[col].dataType == StringType():
-        continue
+        data = data.withColumn(col, F.col(col).cast("string"))
         
       for method in methods:
         if method=="alphanumeric_only":
