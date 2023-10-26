@@ -946,7 +946,11 @@ class AutoLinker:
         # finally, set attribute columns
         attribute_columns = [x[2] for x in remappings]
     else:
-      attribute_columns = self.estimate_clustering_columns(data)
+      attribute_columns = self.estimate_clustering_columns(
+        data
+        , unique_id
+        , true_label
+      )
     return attribute_columns, data
 
   def _get_rowcounts(self, linker_mode, autolink_data):
@@ -1058,8 +1062,8 @@ class AutoLinker:
   def estimate_clustering_columns(
           self
           , data: pyspark.sql.dataframe.DataFrame
-          ,unique_id
-          ,true_label
+          ,unique_id: str
+          ,true_label: str
   ):
     '''
     Use all values as attributes for deduping.
