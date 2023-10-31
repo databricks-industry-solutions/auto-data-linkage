@@ -82,7 +82,7 @@ class AutoLinker:
     """
     Initialises an AutoLinker instance to perform automated record linking.
     """
-    self.spark = spark 
+    self.spark = spark
     self.catalog = catalog
     self.schema = schema
 
@@ -101,6 +101,9 @@ class AutoLinker:
     self.attribute_columns = None
     self.unique_id = None
     self.linker_mode = None
+
+    self._current_linker = None
+    self._current_predictions = None
 
     enable_arc()
 
@@ -557,6 +560,8 @@ class AutoLinker:
     # Make predictions
     predictions = linker.predict()
 
+    self._current_linker = linker
+    self._current_predictions = predictions
 
     return linker, predictions
   
@@ -789,7 +794,7 @@ class AutoLinker:
       for k, v in evals.items():
         result.update({k:v})
       # this is in place for demo purposes - no need to retrain on best params if we have only trained one model
-      return linker, predictions, result
+      return result
 
     # initialise trials and create hyperopt space
     self.trials = Trials()
@@ -810,7 +815,7 @@ class AutoLinker:
     # turn AQE back on once we're out of scala
     self.spark.conf.set("spark.databricks.optimizer.adaptive.enabled", 'True')
       # run hyperopt trials
-    current_linker, current_predictions, self.best = fmin(
+    self.best = fmin(
         fn=tune_model,
         space=space,
         algo=tpe.suggest,
@@ -823,12 +828,13 @@ class AutoLinker:
     best_param_for_rt = self._convert_hyperopt_to_splink()
     
     self.best_run_id = self.trials.best_trial["result"]["run_id"]
+
     if max_evals > 1:
       self.best_linker, self.best_predictions_df = self.train_linker(self._autolink_data, best_param_for_rt, self.attribute_columns, self.unique_id, self.training_columns)
-    # this is in place for demo purposes - no need to retrain on best params if we have only trained one model
     else:
-      self.best_linker = current_linker
-      self.best_predictions_df = current_predictions
+      self.best_linker = self._current_linker
+      self.best_predictions_df = self._current_predictions
+
     
     # return succes text
     success_text = f"""
