@@ -788,8 +788,8 @@ class AutoLinker:
       result = {'loss': loss, 'status': STATUS_OK, 'run_id': run_id}
       for k, v in evals.items():
         result.update({k:v})
-
-      return result
+      # this is in place for demo purposes - no need to retrain on best params if we have only trained one model
+      return linker, predictions, result
 
     # initialise trials and create hyperopt space
     self.trials = Trials()
@@ -810,7 +810,7 @@ class AutoLinker:
     # turn AQE back on once we're out of scala
     self.spark.conf.set("spark.databricks.optimizer.adaptive.enabled", 'True')
       # run hyperopt trials
-    self.best = fmin(
+    current_linker, current_predictions, self.best = fmin(
         fn=tune_model,
         space=space,
         algo=tpe.suggest,
@@ -823,8 +823,12 @@ class AutoLinker:
     best_param_for_rt = self._convert_hyperopt_to_splink()
     
     self.best_run_id = self.trials.best_trial["result"]["run_id"]
-    self.best_linker, self.best_predictions_df = self.train_linker(self._autolink_data, best_param_for_rt, self.attribute_columns, self.unique_id, self.training_columns)
-
+    if max_evals > 1:
+      self.best_linker, self.best_predictions_df = self.train_linker(self._autolink_data, best_param_for_rt, self.attribute_columns, self.unique_id, self.training_columns)
+    # this is in place for demo purposes - no need to retrain on best params if we have only trained one model
+    else:
+      self.best_linker = current_linker
+      self.best_predictions_df = current_predictions
     
     # return succes text
     success_text = f"""
