@@ -115,7 +115,7 @@ autolinker.best_predictions_df.as_spark_dataframe().display()
 
 # COMMAND ----------
 
-autolinker.cluster_viewer()
+#autolinker.cluster_viewer()
 
 # COMMAND ----------
 
