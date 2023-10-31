@@ -19,7 +19,7 @@ from ..sql import enable_arc
 from hyperopt import fmin, tpe, hp, STATUS_OK, Trials
 
 from . import splink_mlflow
-from .cleaning import _do_column_cleaning
+from . import cleaning
 
 import numpy as np
 import math
@@ -756,7 +756,7 @@ class AutoLinker:
     self.data_rowcount = self._get_rowcounts(self.linker_mode, self._autolink_data)
     
     # Clean the data
-    self._autolink_data = _do_column_cleaning(
+    self._autolink_data = cleaning._do_column_cleaning(
       self._cleaning_mode
       , self._autolink_data
       , self.linker_mode
