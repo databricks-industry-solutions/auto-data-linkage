@@ -9,5 +9,5 @@ sphinx-tabs==3.2.0
 mlflow>=1.8.0
 hyperopt>=0.2.0
 pyspark>=3.0.0
-splink>=3.0.0
+splink==3.9.4
 piccolo-theme==0.15.0
