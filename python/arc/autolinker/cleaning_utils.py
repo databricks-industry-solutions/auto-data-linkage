@@ -52,7 +52,7 @@ def _do_column_cleaning(
         , autolink_data
         , linker_mode
         , attribute_columns
-) -> typing.Union[pyspark.sql.dataframe.DataFrame, list]:
+) -> typing.Union[DataFrame, list]:
     # Clean the data
     if linker_mode == "dedupe_only":
         output_data = _clean_columns(cleaning_mode, autolink_data, attribute_columns)
