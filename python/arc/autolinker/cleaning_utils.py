@@ -1,10 +1,11 @@
-import pyspark
+from pyspark.sql.types import StringType
+from pyspark.sql import DataFrame
 import pyspark.sql.functions as F
 import typing
 
 def _clean_columns(
         cleaning_mode: str,
-        data: pyspark.sql.DataFrame,
+        data: DataFrame,
         attribute_columns: list):
     """
     Method to clean string columns (turn them to lower case and remove non-alphanumeric characters)
