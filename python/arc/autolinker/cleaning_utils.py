@@ -22,8 +22,8 @@ def _clean_columns(
     """
 
     cleaning = cleaning_mode
-    # if cleaning is set to "none", don't do anything to the data
-    if cleaning == "none":
+    # if cleaning is secleaningt to "none", don't do anything to the data
+    if cleaning_mode == "none":
         return data
 
     # if it's set to "all", turn it into a dictionary covering all possible cases
