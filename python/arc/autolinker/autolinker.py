@@ -19,7 +19,7 @@ from ..sql import enable_arc
 from hyperopt import fmin, tpe, hp, STATUS_OK, Trials
 
 from . import splink_mlflow
-from cleaning import _do_column_cleaning
+from .cleaning import _do_column_cleaning
 
 import numpy as np
 import math
