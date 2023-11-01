@@ -19,6 +19,7 @@ from ..sql import enable_arc
 from hyperopt import fmin, tpe, hp, STATUS_OK, Trials
 
 from . import splink_mlflow
+from . import cleaning_utils
 
 import numpy as np
 import math
@@ -81,7 +82,7 @@ class AutoLinker:
     """
     Initialises an AutoLinker instance to perform automated record linking.
     """
-    self.spark = spark 
+    self.spark = spark
     self.catalog = catalog
     self.schema = schema
 
@@ -100,6 +101,9 @@ class AutoLinker:
     self.attribute_columns = None
     self.unique_id = None
     self.linker_mode = None
+
+    self._current_linker = None
+    self._current_predictions = None
 
     enable_arc()
 
@@ -373,66 +377,7 @@ class AutoLinker:
         self.spark.sql(f"drop table {self.catalog}.{self.schema}.{table.tableName}") 
       except:
         self.spark.sql(f"drop table {table.tableName}")
-        
-  
-  def _clean_columns(
-    self,
-    data:pyspark.sql.DataFrame,
-    attribute_columns:list):
-    """
-    Method to clean string columns (turn them to lower case and remove non-alphanumeric characters)
-    in order to help with better (and quicker) string-distance calculations. If cleaning is 'all'
-    (as is by default), it will automatically clean as much as it can.  If cleaning is 'none', it will do nothing.
-    cleaning can also be a dictionary with keys as column names and values as lists of method strings.
-    The currently available cleaning methods are turning to lower case and removing non-alphanumeric characters.
 
-    Returns a Spark DataFrame.
-
-    :param data: DataFrame containing the data to be cleaned
-    :param attribute_columns: all attribute columns
-    :param cleaning: string or dicitonary with keys as column names and values as list of valid cleaning method names.
-
-    """
-
-    cleaning = self._cleaning_mode
-    # if cleaning is set to "none", don't do anything to the data
-    if cleaning=="none":
-      return data
-    
-    # if it's set to "all", turn it into a dictionary covering all possible cases
-    if cleaning=="all":
-      cleaning = {col: ["lower", "alphanumeric_only"] for col in attribute_columns}
-      
-    for col, methods in cleaning.items():
-      # if column is not a string, skip it
-      if not data.schema[col].dataType == StringType():
-        continue
-        
-      for method in methods:
-        if method=="alphanumeric_only":
-          # replace column and only keep alphanumeric and space characters
-          data = data.withColumn(col, F.regexp_replace(F.col(col), r"[^A-Za-z0-9 ]+", ""))
-        
-        elif method=="lower":
-          data = data.withColumn(col, F.lower(F.col(col)))
-          
-    return data
-
-  def _do_column_cleaning(
-          self
-          ,autolink_data
-          ,linker_mode
-          ,attribute_columns
-  ) -> typing.Union[pyspark.sql.dataframe.DataFrame, list]:
-    # Clean the data
-    if linker_mode == "dedupe_only":
-      output_data = self._clean_columns(autolink_data, attribute_columns).cache()
-    else:
-      output_data = [
-        self._clean_columns(autolink_data[0], attribute_columns).cache(),
-        self._clean_columns(autolink_data[1], attribute_columns).cache()
-      ]
-    return output_data
 
   def _convert_hyperopt_to_splink(
           self
@@ -615,6 +560,8 @@ class AutoLinker:
     # Make predictions
     predictions = linker.predict()
 
+    self._current_linker = linker
+    self._current_predictions = predictions
 
     return linker, predictions
   
@@ -712,7 +659,7 @@ class AutoLinker:
 
     #set start time for measuring training duration
     start = datetime.now()
-    start_seconds = round(datetime.datetime.today().timestamp())
+    start_seconds = round(datetime.today().timestamp())
     
     # Train model
     linker, predictions = self.train_linker(data, space, attribute_columns, unique_id, training_columns)
@@ -814,11 +761,19 @@ class AutoLinker:
     self.data_rowcount = self._get_rowcounts(self.linker_mode, self._autolink_data)
     
     # Clean the data
-    self._autolink_data = self._do_column_cleaning(
-      self._autolink_data
-      ,self.linker_mode
-      ,self.attribute_columns
+    self._autolink_data = cleaning_utils._do_column_cleaning(
+      self._cleaning_mode
+      , self._autolink_data
+      , self.linker_mode
+      , self.attribute_columns
     )
+
+    # cache the cleaned data
+    if self.linker_mode == "dedupe_only":
+      self._autolink_data.cache()
+    else:
+      self._autolink_data[0].cache()
+      self._autolink_data[1].cache()
     
     # define objective function
     def tune_model(space):
@@ -838,7 +793,7 @@ class AutoLinker:
       result = {'loss': loss, 'status': STATUS_OK, 'run_id': run_id}
       for k, v in evals.items():
         result.update({k:v})
-
+      # this is in place for demo purposes - no need to retrain on best params if we have only trained one model
       return result
 
     # initialise trials and create hyperopt space
@@ -873,7 +828,12 @@ class AutoLinker:
     best_param_for_rt = self._convert_hyperopt_to_splink()
     
     self.best_run_id = self.trials.best_trial["result"]["run_id"]
-    self.best_linker, self.best_predictions_df = self.train_linker(self._autolink_data, best_param_for_rt, self.attribute_columns, self.unique_id, self.training_columns)
+
+    if max_evals > 1:
+      self.best_linker, self.best_predictions_df = self.train_linker(self._autolink_data, best_param_for_rt, self.attribute_columns, self.unique_id, self.training_columns)
+    else:
+      self.best_linker = self._current_linker
+      self.best_predictions_df = self._current_predictions
 
     
     # return succes text
@@ -946,7 +906,11 @@ class AutoLinker:
         # finally, set attribute columns
         attribute_columns = [x[2] for x in remappings]
     else:
-      attribute_columns = self.estimate_clustering_columns(data)
+      attribute_columns = self.estimate_clustering_columns(
+        data
+        , unique_id
+        , true_label
+      )
     return attribute_columns, data
 
   def _get_rowcounts(self, linker_mode, autolink_data):
@@ -1058,8 +1022,8 @@ class AutoLinker:
   def estimate_clustering_columns(
           self
           , data: pyspark.sql.dataframe.DataFrame
-          ,unique_id
-          ,true_label
+          ,unique_id: str
+          ,true_label: str
   ):
     '''
     Use all values as attributes for deduping.
