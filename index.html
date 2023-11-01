@@ -371,26 +371,6 @@ records when split and the entropy of the data points that are being matched.</p
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="arc.autolinker.AutoLinker._clean_columns">
-<span class="sig-name descname"><span class="pre">_clean_columns</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attribute_columns</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.AutoLinker._clean_columns" title="Permalink to this definition">¶</a></dt>
-<dd><p>Method to clean string columns (turn them to lower case and remove non-alphanumeric characters)
-in order to help with better (and quicker) string-distance calculations. If cleaning is ‘all’
-(as is by default), it will automatically clean as much as it can.  If cleaning is ‘none’, it will do nothing.
-cleaning can also be a dictionary with keys as column names and values as lists of method strings.
-The currently available cleaning methods are turning to lower case and removing non-alphanumeric characters.</p>
-<p>Returns a Spark DataFrame.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>data</strong> (<em>pyspark.sql.dataframe.DataFrame</em>) – DataFrame containing the data to be cleaned</p></li>
-<li><p><strong>attribute_columns</strong> (<em>list</em>) – all attribute columns</p></li>
-<li><p><strong>cleaning</strong> – string or dicitonary with keys as column names and values as list of valid cleaning method names.</p></li>
-</ul>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
 <dt class="sig sig-object py" id="arc.autolinker.AutoLinker._convert_hyperopt_to_splink">
 <span class="sig-name descname"><span class="pre">_convert_hyperopt_to_splink</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.AutoLinker._convert_hyperopt_to_splink" title="Permalink to this definition">¶</a></dt>
 <dd><p>Method to convert hyperopt trials to a dictionary that can be used to
@@ -456,16 +436,6 @@ with function names and threhsolds, and a list (of lists) of blocking rules to t
 <dt class="sig sig-object py" id="arc.autolinker.AutoLinker._do_clustering">
 <span class="sig-name descname"><span class="pre">_do_clustering</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.AutoLinker._do_clustering" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="arc.autolinker.AutoLinker._do_column_cleaning">
-<span class="sig-name descname"><span class="pre">_do_column_cleaning</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">autolink_data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">linker_mode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attribute_columns</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#arc.autolinker.AutoLinker._do_column_cleaning" title="Permalink to this definition">¶</a></dt>
-<dd><dl class="field-list simple">
-<dt class="field-odd">Return type</dt>
-<dd class="field-odd"><p><em>Union</em>[pyspark.sql.dataframe.DataFrame, list]</p>
-</dd>
-</dl>
-</dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="arc.autolinker.AutoLinker._drop_intermediate_tables">
@@ -657,7 +627,11 @@ Parameters
 data :</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><p><strong>data</strong> (<em>pyspark.sql.dataframe.DataFrame</em>) – </p>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data</strong> (<em>pyspark.sql.dataframe.DataFrame</em>) – </p></li>
+<li><p><strong>unique_id</strong> (<em>str</em>) – </p></li>
+<li><p><strong>true_label</strong> (<em>str</em>) – </p></li>
+</ul>
 </dd>
 </dl>
 </dd></dl>
