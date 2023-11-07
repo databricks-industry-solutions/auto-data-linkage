@@ -162,7 +162,7 @@ linker2.auto_link(
 
 # COMMAND ----------
 
-clusters = linker1.best_clusters_at_threshold()
+clusters = linker2.best_clusters_at_threshold()
 clusters.orderBy("cluster_id").display()
 
 # COMMAND ----------
