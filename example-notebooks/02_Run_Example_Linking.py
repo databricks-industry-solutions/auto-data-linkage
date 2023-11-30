@@ -189,7 +189,7 @@ clusters.orderBy("cluster_id").display()
 
 # COMMAND ----------
 
-predictions = linker1.best_predictions_df.as_spark_dataframe()
+predictions = linker2.best_predictions_df.as_spark_dataframe()
 predictions.display()
 
 # COMMAND ----------
@@ -201,7 +201,7 @@ predictions.display()
 
 # COMMAND ----------
 
-linker1.match_weights_chart()
+linker2.match_weights_chart()
 
 # COMMAND ----------
 
@@ -213,8 +213,8 @@ linker1.match_weights_chart()
 
 # COMMAND ----------
 
-records_to_view  = linker1.best_predictions_df.as_record_dict(limit=5)
-linker1.best_linker.waterfall_chart(records_to_view, filter_nulls=False)
+records_to_view  = linker2.best_predictions_df.as_record_dict(limit=5)
+linker2.best_linker.waterfall_chart(records_to_view, filter_nulls=False)
 
 # COMMAND ----------
 
@@ -227,7 +227,7 @@ linker1.best_linker.waterfall_chart(records_to_view, filter_nulls=False)
 
 # COMMAND ----------
 
-linker = linker1.best_linker
+linker = linker2.best_linker
 linker.m_u_parameters_chart()
 
 # COMMAND ----------
