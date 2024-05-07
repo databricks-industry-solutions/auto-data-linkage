@@ -61,7 +61,7 @@ duplicates = spark.read.csv(f"file:{os.getcwd()}/data/duplicates.csv", header=Tr
 main_records = spark.read.csv(f"file:{os.getcwd()}/data/main_records.csv", header=True).repartition(200).cache()
 data = duplicates.union(main_records)
 
-print(f"There are {data.count} records in total.")
+print(f"There are {data.count()} records in total.")
 data.display()
 
 # COMMAND ----------
