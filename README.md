@@ -1,3 +1,6 @@
+# ARC has not been under development since early 2022. It is highly recommended you do not use this tool, and is left here purely as a resource for those wishing to explore automatic linking with Splink. It is recommended that you instead use Splink directly. 
+
+
 # Databricks ARC
 
 Welcome to the Databricks ARC Github page.
