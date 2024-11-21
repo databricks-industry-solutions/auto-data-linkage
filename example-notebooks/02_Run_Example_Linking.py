@@ -60,8 +60,8 @@ import os
 duplicates = spark.read.csv(f"file:{os.getcwd()}/data/duplicates.csv", header=True).repartition(200).cache() 
 main_records = spark.read.csv(f"file:{os.getcwd()}/data/main_records.csv", header=True).repartition(200).cache()
 
-print(f"There are {main_records.count} records in main_records.csv.")
-print(f"There are {duplicates.count} records in duplicates.csv.")
+print(f"There are {main_records.count()} records in main_records.csv.")
+print(f"There are {duplicates.count()} records in duplicates.csv.")
 
 display(duplicates)
 
